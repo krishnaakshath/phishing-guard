@@ -61,20 +61,25 @@
 /* Light theme - applied when theme.js determines it's daytime at the
    user's location (or as a graceful fallback, local clock time). */
 :root[data-theme="light"] {
-    --bg-primary: #f8fafc;
+    /* bg-primary is deliberately more tinted than a near-white gray so
+       bg-secondary (card/row surfaces) actually reads as "lifted" rather
+       than blending into the page - the earlier version had these two
+       almost identical, which is why the first real screenshot looked
+       flat despite having borders. */
+    --bg-primary: #eef1f6;
     --bg-secondary: #ffffff;
-    --bg-tertiary: #f1f5f9;
-    --bg-glass: rgba(255, 255, 255, 0.9);
+    --bg-tertiary: #e7ebf2;
+    --bg-glass: rgba(255, 255, 255, 0.92);
 
     --text-primary: #0f172a;
     --text-secondary: #475569;
     --text-muted: #64748b;
 
-    --border: #e2e8f0;
-    --border-strong: #cbd5e1;
+    --border: #dde2ea;
+    --border-strong: #c7cedb;
     --overlay-hover: rgba(15, 23, 42, 0.04);
 
-    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
     --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
     --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.1);
     --shadow-glow: 0 2px 8px rgba(139, 92, 246, 0.12);
@@ -100,6 +105,11 @@ body {
     flex-direction: column;
     min-height: 520px;
     background: var(--bg-primary);
+    /* One deliberate touch of brand identity, not scattered decoration -
+       a 3px accent line so the product still feels distinctly "Phishing
+       Guard" rather than a generic settings panel. */
+    border-top: 3px solid transparent;
+    border-image: var(--gradient-primary) 1;
 }
 
 .app.disabled {
@@ -353,6 +363,7 @@ button:focus-visible,
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
+    box-shadow: var(--shadow-sm);
 }
 
 .module-row {
@@ -451,6 +462,7 @@ button:focus-visible,
     border-radius: var(--radius-md);
     text-align: center;
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
 }
 
 .stat-card.threats {
@@ -497,15 +509,36 @@ button:focus-visible,
     justify-content: center;
     gap: 6px;
     padding: 12px;
-    border: none;
     background: var(--bg-secondary);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     color: var(--text-secondary);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Subtle default tinting so Trust/Block read as their action even before
+   hover, not just on interaction - a real affordance improvement, not
+   decoration. Targeted by id rather than position/order so this can't
+   silently break if the buttons are ever reordered. */
+#whitelist-btn {
+    color: var(--success);
+    border-color: var(--success);
+    opacity: 0.85;
+}
+
+.action-btn.danger {
+    color: var(--danger);
+    border-color: var(--danger);
+    opacity: 0.85;
+}
+
+#whitelist-btn:hover,
+.action-btn.danger:hover {
+    opacity: 1;
 }
 
 .action-btn:hover {
