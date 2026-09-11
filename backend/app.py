@@ -5,6 +5,8 @@ Industry-Ready Flask application with enhanced security features
 
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from functools import wraps
 import logging
 from datetime import datetime
@@ -14,6 +16,9 @@ import os
 from detector import scan_url, scan_content
 from threat_intel import check_url, check_domain, analyze_content, add_whitelist, add_blacklist, get_lists
 import models
+import security_grade
+import breach_check
+import secret_scanner
 
 # Configure logging
 logging.basicConfig(
@@ -26,9 +31,14 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'phishing-guard-secret-key-change-in-production')
 
-# Enable CORS for Chrome extension and dashboard
-# Add your production domains here
-ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', '*').split(',')
+# Enable CORS for Chrome extension and dashboard.
+# Defaults to the extension + production dashboard origins rather than '*' -
+# set ALLOWED_ORIGINS explicitly (comma-separated) to override in your own
+# deployment. Chrome extensions send an "chrome-extension://<id>" origin
+# that changes per install, so that scheme is allowed broadly; tighten it
+# to your specific extension ID once published if you want to lock it down.
+DEFAULT_ALLOWED_ORIGINS = 'chrome-extension://*,https://phishing-guard-seven.vercel.app,http://localhost:5173,http://localhost:3000'
+ALLOWED_ORIGINS = (os.environ.get('ALLOWED_ORIGINS') or DEFAULT_ALLOWED_ORIGINS).split(',')
 CORS(app, resources={
     r"/api/*": {
         "origins": ALLOWED_ORIGINS,
@@ -37,12 +47,44 @@ CORS(app, resources={
     }
 })
 
+# Rate limiting - protects /api/scan from abuse (each scan can trigger a
+# WHOIS lookup + SSL handshake + external feed check) and /api/auth/* from
+# brute force. Storage defaults to in-memory, which is fine for a single
+# instance; note in README if scaling to multiple workers.
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per hour"],
+    storage_uri="memory://"
+)
+
 # Global statistics (in-memory, for quick access)
 stats = {
     'total_scans': 0,
     'threats_detected': 0,
     'start_time': datetime.now().isoformat()
 }
+
+
+def require_admin(f):
+    """Decorator to require an authenticated admin user.
+    Always re-checks is_admin server-side - never trusts a client flag."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({'error': 'API key required'}), 401
+
+        user = models.get_user_by_api_key(api_key)
+        if not user:
+            return jsonify({'error': 'Invalid API key'}), 401
+
+        if not user.get('is_admin'):
+            return jsonify({'error': 'Admin access required'}), 403
+
+        g.user = user
+        return f(*args, **kwargs)
+    return decorated
 
 
 # ============================================
@@ -117,6 +159,7 @@ def get_stats():
 # ============================================
 
 @app.route('/api/auth/register', methods=['POST'])
+@limiter.limit("10 per hour")
 def register():
     """Register new user"""
     try:
@@ -151,6 +194,7 @@ def register():
 
 
 @app.route('/api/auth/login', methods=['POST'])
+@limiter.limit("15 per hour")
 def login():
     """Authenticate user"""
     try:
@@ -188,7 +232,8 @@ def get_current_user():
     return jsonify({
         'user': {
             'id': g.user['id'],
-            'email': g.user['email']
+            'email': g.user['email'],
+            'is_admin': g.user.get('is_admin', False)
         }
     })
 
@@ -234,6 +279,7 @@ def update_settings():
 # ============================================
 
 @app.route('/api/scan', methods=['POST'])
+@limiter.limit("60 per minute")
 @optional_api_key
 def scan_endpoint():
     """
@@ -560,10 +606,12 @@ def report_phishing():
         
         from urllib.parse import urlparse
         domain = urlparse(url).netloc
-        
-        # Add to global threat database
+
+        # Add to the in-memory blocklist (immediate effect for future scans)
+        # and the persistent threat database (admin-reviewable record)
         add_blacklist(domain)
-        
+        models.add_threat_report(domain, threat_type='phishing', severity='medium')
+
         logger.info(f"Phishing report received: {url}")
         
         return jsonify({
@@ -573,6 +621,120 @@ def report_phishing():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# PUBLIC SECURITY TOOLS (no auth required)
+# ============================================
+
+@app.route('/api/check-password-breach', methods=['POST'])
+@limiter.limit("20 per hour")
+def check_password_breach_endpoint():
+    """
+    Check whether a password appears in known breach data via HIBP's
+    k-anonymity API. Only a 5-char hash prefix ever leaves this server.
+    """
+    try:
+        data = request.get_json()
+        password = data.get('password') if data else None
+
+        if not password:
+            return jsonify({'error': 'Password is required'}), 400
+
+        result = breach_check.check_password_breach(password)
+        return jsonify({'success': True, 'result': result})
+
+    except Exception as e:
+        logger.error(f"Password breach check error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/site-scan', methods=['GET'])
+@limiter.limit("20 per hour")
+def site_scan_endpoint():
+    """
+    Public site security checkup: security header/TLS/cookie grade plus
+    an exposed-secrets scan of the page's HTML. No auth required - this
+    is meant to be shareable, like Mozilla Observatory.
+    """
+    url = request.args.get('url')
+    if not url:
+        return jsonify({'error': 'url query parameter is required'}), 400
+
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = f'https://{url}'
+
+    try:
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc
+
+        posture = security_grade.grade_site(url)
+
+        try:
+            import requests as _requests
+            page_resp = _requests.get(url, timeout=6)
+            secrets = secret_scanner.scan_for_secrets(page_resp.text)
+        except Exception as e:
+            logger.warning(f"Secret scan fetch failed for {url}: {e}")
+            secrets = []
+
+        threat_result = check_url(url)
+
+        return jsonify({
+            'success': True,
+            'url': url,
+            'domain': domain,
+            'posture': posture,
+            'secrets': secrets,
+            'threat_intel': {
+                'reputation_score': threat_result.get('reputation_score'),
+                'threat_types': threat_result.get('threat_types', [])
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Site scan error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# ADMIN ENDPOINTS
+# ============================================
+
+@app.route('/api/admin/stats', methods=['GET'])
+@require_admin
+def admin_stats():
+    return jsonify({'success': True, 'stats': models.get_global_stats()})
+
+
+@app.route('/api/admin/threats', methods=['GET'])
+@require_admin
+def admin_list_threats():
+    return jsonify({'success': True, 'threats': models.list_threat_reports()})
+
+
+@app.route('/api/admin/threats/<int:threat_id>/verify', methods=['POST'])
+@require_admin
+def admin_verify_threat(threat_id):
+    success = models.verify_threat_report(threat_id)
+    if not success:
+        return jsonify({'error': 'Threat report not found'}), 404
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/threats/<int:threat_id>', methods=['DELETE'])
+@require_admin
+def admin_delete_threat(threat_id):
+    success = models.delete_threat_report(threat_id)
+    if not success:
+        return jsonify({'error': 'Threat report not found'}), 404
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/users', methods=['GET'])
+@require_admin
+def admin_list_users():
+    return jsonify({'success': True, 'users': models.list_all_users()})
 
 
 # ============================================

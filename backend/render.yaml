@@ -4,8 +4,23 @@ services:
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    # Persistent disk so the SQLite DB (users, whitelist/blacklist, scan
+    # history, threat reports) survives redeploys instead of living on the
+    # container's ephemeral filesystem.
+    disk:
+      name: phishing-guard-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: DB_PATH
+        value: /var/data/phishing_guard.db
+      # Optional - detection works without these, but is meaningfully
+      # better with them. Set in the Render dashboard, not committed here.
+      - key: SAFE_BROWSING_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

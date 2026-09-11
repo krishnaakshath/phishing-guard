@@ -11,8 +11,10 @@ from typing import Dict, List, Optional
 import hashlib
 import secrets
 
-# Database path
-DB_PATH = os.path.join(os.path.dirname(__file__), 'phishing_guard.db')
+# Database path - override with DB_PATH pointing at a persistent disk mount
+# in production (see render.yaml). Without this, SQLite lives on the
+# container's ephemeral filesystem and every redeploy wipes all users.
+DB_PATH = os.environ.get('DB_PATH') or os.path.join(os.path.dirname(__file__), 'phishing_guard.db')
 
 
 def get_db_connection():
@@ -34,10 +36,18 @@ def init_database():
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             api_key TEXT UNIQUE,
+            is_admin BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP
         )
     ''')
+
+    # Older databases won't have is_admin - add it if missing rather than
+    # forcing everyone through a migration tool for one column.
+    cursor.execute("PRAGMA table_info(users)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+    if 'is_admin' not in existing_columns:
+        cursor.execute('ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0')
     
     # User settings table
     cursor.execute('''
@@ -175,11 +185,12 @@ def create_user(email: str, password: str) -> Optional[Dict]:
         ''', (user_id,))
         
         conn.commit()
-        
+
         return {
             'id': user_id,
             'email': email.lower(),
-            'api_key': api_key
+            'api_key': api_key,
+            'is_admin': False
         }
     except sqlite3.IntegrityError:
         return None
@@ -202,13 +213,14 @@ def authenticate_user(email: str, password: str) -> Optional[Dict]:
         ''', (user['id'],))
         conn.commit()
         conn.close()
-        
+
         return {
             'id': user['id'],
             'email': user['email'],
-            'api_key': user['api_key']
+            'api_key': user['api_key'],
+            'is_admin': bool(user['is_admin'])
         }
-    
+
     conn.close()
     return None
 
@@ -217,18 +229,138 @@ def get_user_by_api_key(api_key: str) -> Optional[Dict]:
     """Get user by API key"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     cursor.execute('SELECT * FROM users WHERE api_key = ?', (api_key,))
     user = cursor.fetchone()
     conn.close()
-    
+
     if user:
         return {
             'id': user['id'],
             'email': user['email'],
-            'api_key': user['api_key']
+            'api_key': user['api_key'],
+            'is_admin': bool(user['is_admin'])
         }
     return None
+
+
+def add_threat_report(domain: str, threat_type: str = 'phishing', severity: str = 'medium') -> bool:
+    """Record a user-submitted phishing report in the global threat database
+    (upsert - repeated reports for the same domain bump reported_count
+    instead of creating duplicate rows)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+            INSERT INTO threat_database (domain, threat_type, severity, reported_count)
+            VALUES (?, ?, ?, 1)
+            ON CONFLICT(domain) DO UPDATE SET
+                reported_count = reported_count + 1,
+                last_seen = CURRENT_TIMESTAMP
+        ''', (domain.lower(), threat_type, severity))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error adding threat report: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+# ============================================
+# ADMIN
+# ============================================
+
+def list_all_users() -> List[Dict]:
+    """List all users for the admin panel. Never includes password_hash."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT id, email, is_admin, created_at, last_login FROM users ORDER BY created_at DESC')
+    users = cursor.fetchall()
+    conn.close()
+
+    return [{
+        'id': u['id'],
+        'email': u['email'],
+        'is_admin': bool(u['is_admin']),
+        'created_at': u['created_at'],
+        'last_login': u['last_login']
+    } for u in users]
+
+
+def get_global_stats() -> Dict:
+    """Aggregate stats across all users for the admin overview."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT COUNT(*) as count FROM users')
+    total_users = cursor.fetchone()['count']
+
+    cursor.execute('SELECT COUNT(*) as count FROM scan_history')
+    total_scans = cursor.fetchone()['count']
+
+    cursor.execute('SELECT COUNT(*) as count FROM scan_history WHERE is_phishing = 1')
+    total_threats = cursor.fetchone()['count']
+
+    cursor.execute('SELECT COUNT(*) as count FROM threat_database WHERE verified = 0')
+    reports_pending = cursor.fetchone()['count']
+
+    conn.close()
+
+    return {
+        'total_users': total_users,
+        'total_scans': total_scans,
+        'total_threats': total_threats,
+        'reports_pending': reports_pending
+    }
+
+
+def list_threat_reports() -> List[Dict]:
+    """List all entries in the global threat database for moderation."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT id, domain, threat_type, severity, reported_count, verified, first_seen, last_seen
+        FROM threat_database ORDER BY last_seen DESC
+    ''')
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [{
+        'id': r['id'],
+        'domain': r['domain'],
+        'threat_type': r['threat_type'],
+        'severity': r['severity'],
+        'reported_count': r['reported_count'],
+        'verified': bool(r['verified']),
+        'first_seen': r['first_seen'],
+        'last_seen': r['last_seen']
+    } for r in rows]
+
+
+def verify_threat_report(report_id: int) -> bool:
+    """Mark a threat database entry as verified by an admin."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE threat_database SET verified = 1 WHERE id = ?', (report_id,))
+    conn.commit()
+    changed = cursor.rowcount > 0
+    conn.close()
+    return changed
+
+
+def delete_threat_report(report_id: int) -> bool:
+    """Remove a threat database entry (e.g. a false positive report)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM threat_database WHERE id = ?', (report_id,))
+    conn.commit()
+    changed = cursor.rowcount > 0
+    conn.close()
+    return changed
 
 
 # ============================================

@@ -4,6 +4,8 @@ Real-time threat intelligence, reputation scoring, and blocklist management
 """
 
 import hashlib
+import logging
+import os
 import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
@@ -12,6 +14,79 @@ import socket
 import ssl
 import requests
 from urllib.parse import urlparse
+
+import cache
+
+logger = logging.getLogger(__name__)
+
+# Optional external feeds. Both are safe to leave unconfigured/unreachable -
+# every call site here degrades to "no signal" rather than raising, so a
+# missing API key or a feed outage never breaks a scan.
+SAFE_BROWSING_API_KEY = os.environ.get('SAFE_BROWSING_API_KEY')
+SAFE_BROWSING_ENDPOINT = 'https://safebrowsing.googleapis.com/v4/threatMatches:find'
+OPENPHISH_FEED_URL = 'https://openphish.com/feed.txt'
+DOMAIN_INTEL_CACHE_TTL = 24 * 3600
+OPENPHISH_FEED_CACHE_TTL = 6 * 3600
+
+
+def check_safe_browsing(url: str) -> Optional[Dict]:
+    """
+    Check a URL against Google Safe Browsing v4.
+    Returns None (no signal) if no API key is configured or the request fails.
+    """
+    if not SAFE_BROWSING_API_KEY:
+        return None
+
+    payload = {
+        'client': {'clientId': 'phishing-guard', 'clientVersion': '3.0.0'},
+        'threatInfo': {
+            'threatTypes': ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE',
+                             'POTENTIALLY_HARMFUL_APPLICATION'],
+            'platformTypes': ['ANY_PLATFORM'],
+            'threatEntryTypes': ['URL'],
+            'threatEntries': [{'url': url}]
+        }
+    }
+
+    try:
+        resp = requests.post(
+            SAFE_BROWSING_ENDPOINT,
+            params={'key': SAFE_BROWSING_API_KEY},
+            json=payload,
+            timeout=4
+        )
+        resp.raise_for_status()
+        matches = resp.json().get('matches', [])
+        return {
+            'flagged': len(matches) > 0,
+            'threat_types': [m.get('threatType') for m in matches]
+        }
+    except Exception as e:
+        logger.warning(f"Safe Browsing check failed: {e}")
+        return None
+
+
+def _get_openphish_feed() -> set:
+    """Fetch (or return cached) OpenPhish community feed as a set of URLs."""
+    cached = cache.get_cached('openphish_feed', OPENPHISH_FEED_CACHE_TTL)
+    if cached is not None:
+        return set(cached['urls'])
+
+    try:
+        resp = requests.get(OPENPHISH_FEED_URL, timeout=5)
+        resp.raise_for_status()
+        urls = [line.strip() for line in resp.text.splitlines() if line.strip()]
+        cache.set_cached('openphish_feed', {'urls': urls})
+        return set(urls)
+    except Exception as e:
+        logger.warning(f"OpenPhish feed fetch failed: {e}")
+        return set()
+
+
+def check_openphish(url: str) -> bool:
+    """Check a URL against the cached OpenPhish community feed."""
+    feed = _get_openphish_feed()
+    return url in feed or url.rstrip('/') in feed
 
 # ============================================
 # THREAT INTELLIGENCE DATABASES
@@ -148,9 +223,14 @@ class ThreatIntelligence:
                 break
         
         result['checks_performed'].append('pattern_matching')
-        
-        # Check domain age if possible
-        age_result = self._check_domain_age(domain)
+
+        # Check domain age if possible (cached - WHOIS lookups are slow and
+        # often rate-limited, and this runs on every page navigation)
+        cache_key = f"domain_age:{domain}"
+        age_result = cache.get_cached(cache_key, DOMAIN_INTEL_CACHE_TTL)
+        if age_result is None:
+            age_result = self._check_domain_age(domain) or {}
+            cache.set_cached(cache_key, age_result)
         if age_result:
             result['domain_age_days'] = age_result.get('age_days')
             if age_result.get('age_days', 365) < 30:
@@ -158,9 +238,13 @@ class ThreatIntelligence:
                 result['reputation_score'] -= 25
                 result['threat_types'].append('new_domain')
             result['checks_performed'].append('domain_age')
-        
-        # Check SSL certificate
-        ssl_result = self._check_ssl_certificate(domain)
+
+        # Check SSL certificate (also cached - opens a live socket otherwise)
+        ssl_cache_key = f"ssl_cert:{domain}"
+        ssl_result = cache.get_cached(ssl_cache_key, DOMAIN_INTEL_CACHE_TTL)
+        if ssl_result is None:
+            ssl_result = self._check_ssl_certificate(domain) or {}
+            cache.set_cached(ssl_cache_key, ssl_result)
         if ssl_result:
             result['ssl_info'] = ssl_result
             # Only penalize for actual verification failures, not connection errors
@@ -343,7 +427,23 @@ class ThreatIntelligence:
             
             # Get domain reputation
             reputation = self.check_domain_reputation(domain)
-            
+
+            # Cross-check against external threat feeds. These are keyed on
+            # the full URL (not just domain) and never raise - a missing key
+            # or an unreachable feed just means "no additional signal".
+            sb_result = check_safe_browsing(url)
+            if sb_result and sb_result.get('flagged'):
+                reputation['risk_factors'].append('Flagged by Google Safe Browsing')
+                reputation['reputation_score'] = max(0, reputation['reputation_score'] - 60)
+                reputation['threat_types'].extend(sb_result.get('threat_types', []))
+                reputation['checks_performed'].append('safe_browsing')
+
+            if check_openphish(url):
+                reputation['risk_factors'].append('Listed in OpenPhish community feed')
+                reputation['reputation_score'] = max(0, reputation['reputation_score'] - 50)
+                reputation['threat_types'].append('known_phishing_feed')
+                reputation['checks_performed'].append('openphish_feed')
+
             result = {
                 'url': url,
                 'domain': domain,
@@ -353,10 +453,10 @@ class ThreatIntelligence:
                 'threat_types': reputation['threat_types'],
                 'recommendation': 'proceed' if reputation['reputation_score'] >= 60 else 'caution'
             }
-            
+
             if reputation['reputation_score'] < 40:
                 result['recommendation'] = 'avoid'
-            
+
             return result
             
         except Exception as e:
