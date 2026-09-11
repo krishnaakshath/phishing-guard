@@ -19,6 +19,7 @@ import models
 import security_grade
 import breach_check
 import secret_scanner
+import notifications
 
 # Configure logging
 logging.basicConfig(
@@ -611,6 +612,14 @@ def report_phishing():
         # and the persistent threat database (admin-reviewable record)
         add_blacklist(domain)
         models.add_threat_report(domain, threat_type='phishing', severity='medium')
+
+        # Warn anyone who'd whitelisted this domain that it's now been
+        # reported - best-effort, never fails the report itself.
+        try:
+            for whitelister in models.get_users_who_whitelisted(domain):
+                notifications.notify_whitelisted_domain_reported(whitelister['email'], domain)
+        except Exception as e:
+            logger.warning(f"Failed to notify whitelisters of {domain}: {e}")
 
         logger.info(f"Phishing report received: {url}")
         

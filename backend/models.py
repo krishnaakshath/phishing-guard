@@ -512,6 +512,22 @@ def remove_from_whitelist(user_id: int, domain: str) -> bool:
     return True
 
 
+def get_users_who_whitelisted(domain: str) -> List[Dict]:
+    """Find users who whitelisted a domain - used to notify them if it's
+    later reported as phishing (see notifications.py)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT users.id, users.email
+        FROM whitelist
+        JOIN users ON users.id = whitelist.user_id
+        WHERE whitelist.domain = ?
+    ''', (domain.lower(),))
+    rows = cursor.fetchall()
+    conn.close()
+    return [{'id': r['id'], 'email': r['email']} for r in rows]
+
+
 def get_blacklist(user_id: int = None) -> List[Dict]:
     """Get blacklist for user or global"""
     conn = get_db_connection()
