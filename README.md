@@ -34,7 +34,11 @@ threats.
 | Risky outbound link scanning | Extension | Flags dangerous links on the page before you click |
 | Password strength micro-tip | Extension | Local-only entropy check on new-password fields, no network call |
 | Whitelist / blacklist / history | Dashboard | Per-user, backed by the real API |
+| CSV export | History + Admin pages | Client-side, no backend endpoint needed |
+| Whitelist breach alerts | Email (optional) | Notifies you if a site you whitelisted gets reported as phishing |
+| Retroactive history scan | Extension popup | Opt-in check of your last 7 days of browsing against current threat feeds |
 | Admin console | Dashboard `/admin` | Global stats, threat-report moderation, user list |
+| Firefox support | Extension (`manifest.firefox.json`) | Implemented, unverified - see `extension/FIREFOX.md` |
 
 ## Setup
 
