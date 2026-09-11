@@ -5,6 +5,9 @@
 
 import { CONFIG } from './config.js';
 
+// See background.js for why this one alias is enough for cross-browser support.
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
 // UI Elements
 const elements = {
     app: document.getElementById('app'),
@@ -30,7 +33,10 @@ const elements = {
     backendIndicator: document.getElementById('backend-indicator'),
     dashboardBtn: document.getElementById('dashboard-btn'),
     passwordCheckerLink: document.getElementById('password-checker-link'),
-    siteScannerLink: document.getElementById('site-scanner-link')
+    siteScannerLink: document.getElementById('site-scanner-link'),
+    historyScanBtn: document.getElementById('history-scan-btn'),
+    historyScanBtnLabel: document.getElementById('history-scan-btn-label'),
+    historyScanResults: document.getElementById('history-scan-results')
 };
 
 // State
@@ -88,7 +94,7 @@ async function init() {
 
     // Background broadcasts this once a slow /site-scan finishes - pick it
     // up if it lands while the popup happens to be open.
-    chrome.runtime.onMessage.addListener((message) => {
+    browserAPI.runtime.onMessage.addListener((message) => {
         if (message?.action === 'siteGradeUpdated' && message.domain === state.currentDomain) {
             updateGradeChip(message.siteGrade);
         }
@@ -117,6 +123,9 @@ function setupEventListeners() {
     // Public security tools
     elements.passwordCheckerLink?.addEventListener('click', openPasswordChecker);
     elements.siteScannerLink?.addEventListener('click', openSiteScanner);
+
+    // Retroactive history scan
+    elements.historyScanBtn?.addEventListener('click', runHistoryScan);
 }
 
 // ============================================
@@ -185,7 +194,7 @@ async function updateCurrentSite() {
     if (!state.isEnabled) return;
 
     try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
 
         if (!tab?.url) {
             elements.statusDomain.textContent = 'No page';
@@ -524,6 +533,75 @@ function getTimeAgo(timestamp) {
 }
 
 // ============================================
+// RETROACTIVE HISTORY SCAN
+// ============================================
+
+async function runHistoryScan() {
+    if (!elements.historyScanBtn || !elements.historyScanResults) return;
+
+    elements.historyScanBtn.disabled = true;
+    elements.historyScanBtn.classList.add('loading');
+    elements.historyScanBtnLabel.textContent = 'Scanning…';
+    elements.historyScanResults.style.display = 'none';
+
+    const response = await sendMessage({ action: 'scanBrowsingHistory', days: 7 });
+
+    elements.historyScanBtn.disabled = false;
+    elements.historyScanBtn.classList.remove('loading');
+    elements.historyScanBtnLabel.textContent = 'Scan My Recent History';
+
+    renderHistoryScanResults(response);
+}
+
+function renderHistoryScanResults(response) {
+    if (!elements.historyScanResults) return;
+
+    if (!response || response.error) {
+        elements.historyScanResults.innerHTML = `
+            <div class="history-scan-empty">Couldn't complete the scan${response?.error ? `: ${response.error}` : ''}.</div>
+        `;
+        elements.historyScanResults.style.display = 'block';
+        return;
+    }
+
+    if (response.scanned === 0) {
+        elements.historyScanResults.innerHTML = `
+            <div class="history-scan-empty">No recent history to check (or everything's already whitelisted).</div>
+        `;
+        elements.historyScanResults.style.display = 'block';
+        return;
+    }
+
+    if (response.flagged.length === 0) {
+        elements.historyScanResults.innerHTML = `
+            <div class="history-scan-clean">
+                <span>✓</span> Checked ${response.scanned} sites from your recent history - nothing flagged.
+            </div>
+        `;
+        elements.historyScanResults.style.display = 'block';
+        return;
+    }
+
+    const rows = response.flagged.map((item) => {
+        const hostname = getHostname(item.url);
+        return `
+            <div class="history-scan-row ${item.risk_level || 'suspicious'}">
+                <span class="h-site" title="${hostname}">${hostname}</span>
+                <span class="h-status">${item.risk_level || 'flagged'}</span>
+            </div>
+        `;
+    }).join('');
+
+    elements.historyScanResults.innerHTML = `
+        <div class="history-scan-summary">
+            Checked ${response.scanned} sites - ${response.flagged.length} flagged:
+        </div>
+        ${rows}
+    `;
+    elements.historyScanResults.style.display = 'block';
+}
+
+// ============================================
 // BACKEND STATUS
 // ============================================
 
@@ -544,11 +622,11 @@ async function checkBackend() {
 // ============================================
 
 function openDashboard() {
-    chrome.tabs.create({ url: CONFIG.DASHBOARD_URL });
+    browserAPI.tabs.create({ url: CONFIG.DASHBOARD_URL });
 }
 
 function openPasswordChecker() {
-    chrome.tabs.create({ url: `${CONFIG.DASHBOARD_URL}/tools/password-checker` });
+    browserAPI.tabs.create({ url: `${CONFIG.DASHBOARD_URL}/tools/password-checker` });
 }
 
 function openSiteScanner() {
@@ -558,7 +636,7 @@ function openSiteScanner() {
     if (state.currentDomain) {
         url.searchParams.set('url', state.currentDomain);
     }
-    chrome.tabs.create({ url: url.href });
+    browserAPI.tabs.create({ url: url.href });
 }
 
 // ============================================
@@ -626,8 +704,8 @@ function showNotification(message, type = 'info') {
 
 function sendMessage(message) {
     return new Promise(resolve => {
-        chrome.runtime.sendMessage(message, response => {
-            resolve(chrome.runtime.lastError ? null : response);
+        browserAPI.runtime.sendMessage(message, response => {
+            resolve(browserAPI.runtime.lastError ? null : response);
         });
     });
 }

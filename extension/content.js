@@ -10,6 +10,9 @@
     if (window.__phishingGuardInjected) return;
     window.__phishingGuardInjected = true;
 
+    // See background.js for why this one alias is enough for cross-browser support.
+    const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
     // State
     let alertOverlay = null;
     let scanBadge = null;
@@ -39,7 +42,7 @@
         setupInputMonitoring();
 
         // Listen for messages from background
-        chrome.runtime.onMessage.addListener(handleMessage);
+        browserAPI.runtime.onMessage.addListener(handleMessage);
     }
 
     // ==========================================
@@ -51,7 +54,7 @@
 
         // Send to background for full analysis
         try {
-            const response = await chrome.runtime.sendMessage({
+            const response = await browserAPI.runtime.sendMessage({
                 action: 'contentScan',
                 content: pageInfo
             });
@@ -190,7 +193,7 @@
 
             const urls = prioritized.map(([url]) => url);
 
-            const response = await chrome.runtime.sendMessage({ action: 'scanLinks', urls });
+            const response = await browserAPI.runtime.sendMessage({ action: 'scanLinks', urls });
 
             if (!response?.results) return;
 

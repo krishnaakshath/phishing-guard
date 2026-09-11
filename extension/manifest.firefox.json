@@ -4,6 +4,12 @@
     "version": "2.2.0",
     "description": "Real-time phishing protection with continuous scanning. Detects and alerts you about suspicious websites and links.",
     "author": "Phishing Guard Team",
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "phishing-guard@krishnaakshath.dev",
+            "strict_min_version": "121.0"
+        }
+    },
     "permissions": [
         "activeTab",
         "storage",

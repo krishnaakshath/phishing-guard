@@ -6,6 +6,12 @@
 
 import { CONFIG } from './config.js';
 
+// Firefox provides a native, Promise-based `browser` global; Chrome's MV3
+// `chrome.*` APIs also return Promises when no callback is passed (which
+// is the only way this file calls them), so this one alias is enough to
+// run on both without a bundled polyfill.
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
 const API_BASE = CONFIG.API_URL;
 
 // Site security grades don't change minute to minute, so we cache them
@@ -51,14 +57,14 @@ const state = {
 // INITIALIZATION
 // ============================================
 
-chrome.runtime.onInstalled.addListener(async () => {
+browserAPI.runtime.onInstalled.addListener(async () => {
     console.log('Phishing Guard v2.1 installed');
     await loadState();
     await loadSessionCaches();
     updateBadge('active');
 });
 
-chrome.runtime.onStartup.addListener(async () => {
+browserAPI.runtime.onStartup.addListener(async () => {
     await loadState();
     await loadSessionCaches();
     updateBadge(state.isEnabled ? 'active' : 'disabled');
@@ -66,7 +72,7 @@ chrome.runtime.onStartup.addListener(async () => {
 
 async function loadState() {
     try {
-        const saved = await chrome.storage.local.get([
+        const saved = await browserAPI.storage.local.get([
             'isEnabled', 'stats', 'scanHistory', 'settings',
             'whitelist', 'blacklist', 'apiKey'
         ]);
@@ -83,14 +89,14 @@ async function loadState() {
     }
 }
 
-// Site-grade and link-scan results are cached in chrome.storage.session so
+// Site-grade and link-scan results are cached in browserAPI.storage.session so
 // they survive a service-worker restart but are cleared when the browser
 // session ends - matching the "cache for the session" requirement without
-// letting stale security grades persist indefinitely like chrome.storage.local.
+// letting stale security grades persist indefinitely like browserAPI.storage.local.
 async function loadSessionCaches() {
     try {
-        if (!chrome.storage.session) return; // older Chrome without session storage
-        const saved = await chrome.storage.session.get([GRADE_CACHE_KEY, LINK_SCAN_CACHE_KEY]);
+        if (!browserAPI.storage.session) return; // older Chrome without session storage
+        const saved = await browserAPI.storage.session.get([GRADE_CACHE_KEY, LINK_SCAN_CACHE_KEY]);
         if (saved[GRADE_CACHE_KEY]) state.siteGradeCache = saved[GRADE_CACHE_KEY];
         if (saved[LINK_SCAN_CACHE_KEY]) state.linkScanCache = saved[LINK_SCAN_CACHE_KEY];
     } catch (e) {
@@ -100,8 +106,8 @@ async function loadSessionCaches() {
 
 async function saveSiteGradeCache() {
     try {
-        if (!chrome.storage.session) return;
-        await chrome.storage.session.set({ [GRADE_CACHE_KEY]: state.siteGradeCache });
+        if (!browserAPI.storage.session) return;
+        await browserAPI.storage.session.set({ [GRADE_CACHE_KEY]: state.siteGradeCache });
     } catch (e) {
         console.error('Error saving site grade cache:', e);
     }
@@ -109,7 +115,7 @@ async function saveSiteGradeCache() {
 
 async function saveLinkScanCache() {
     try {
-        if (!chrome.storage.session) return;
+        if (!browserAPI.storage.session) return;
         // Keep the cache bounded so a long browsing session doesn't grow forever.
         const entries = Object.entries(state.linkScanCache);
         if (entries.length > MAX_LINK_CACHE_ENTRIES) {
@@ -117,7 +123,7 @@ async function saveLinkScanCache() {
             const toRemove = entries.slice(0, entries.length - MAX_LINK_CACHE_ENTRIES);
             for (const [url] of toRemove) delete state.linkScanCache[url];
         }
-        await chrome.storage.session.set({ [LINK_SCAN_CACHE_KEY]: state.linkScanCache });
+        await browserAPI.storage.session.set({ [LINK_SCAN_CACHE_KEY]: state.linkScanCache });
     } catch (e) {
         console.error('Error saving link scan cache:', e);
     }
@@ -125,7 +131,7 @@ async function saveLinkScanCache() {
 
 async function saveState() {
     try {
-        await chrome.storage.local.set({
+        await browserAPI.storage.local.set({
             isEnabled: state.isEnabled,
             stats: state.stats,
             scanHistory: state.scanHistory.slice(-100),
@@ -143,12 +149,12 @@ async function saveState() {
 // TAB MONITORING
 // ============================================
 
-chrome.webNavigation.onCompleted.addListener(async (details) => {
+browserAPI.webNavigation.onCompleted.addListener(async (details) => {
     if (details.frameId !== 0) return;
     if (!state.isEnabled) return;
 
     try {
-        const tab = await chrome.tabs.get(details.tabId);
+        const tab = await browserAPI.tabs.get(details.tabId);
         if (!tab.url) return;
 
         // Skip chrome:// and extension pages
@@ -169,9 +175,9 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
     }
 });
 
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
+browserAPI.tabs.onActivated.addListener(async (activeInfo) => {
     try {
-        const tab = await chrome.tabs.get(activeInfo.tabId);
+        const tab = await browserAPI.tabs.get(activeInfo.tabId);
         if (!tab.url) return;
 
         applyCombinedBadge(activeInfo.tabId, tab.url);
@@ -180,7 +186,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     }
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => {
+browserAPI.tabs.onRemoved.addListener((tabId) => {
     delete state.currentTabStatus[tabId];
 });
 
@@ -188,7 +194,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // MESSAGE HANDLER
 // ============================================
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+browserAPI.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleMessage(request, sender).then(sendResponse);
     return true;
 });
@@ -218,7 +224,7 @@ async function handleMessage(request, sender) {
             return { success: true, settings: state.settings };
 
         case 'scanCurrentTab':
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
             if (tab?.url) {
                 return await scanUrl(tab.url, tab.id, true);
             }
@@ -260,7 +266,7 @@ async function handleMessage(request, sender) {
             return { success: true };
 
         case 'getSiteGrade': {
-            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const [activeTab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
             const url = request.url || activeTab?.url;
             const tabId = request.tabId ?? activeTab?.id;
             if (!url) return { error: 'No URL available' };
@@ -272,6 +278,13 @@ async function handleMessage(request, sender) {
                 return await scanOutboundLinks(request.urls, sender.tab.id);
             }
             return { error: 'No tab context or urls' };
+
+        case 'scanBrowsingHistory':
+            // Explicit, user-triggered action from the popup only - never
+            // runs automatically, and reads browserAPI.history solely to build
+            // a list of domains to check, not to report browsing history
+            // anywhere itself.
+            return await scanBrowsingHistory(request.days || 7);
 
         default:
             return { error: 'Unknown action' };
@@ -499,7 +512,7 @@ async function getSiteGrade(url, tabId, forceRefresh = false) {
             applyCombinedBadge(tabId, url);
             // Let an open popup know a grade just landed, in case it's
             // showing "Grading..." for the tab it's currently displaying.
-            chrome.runtime.sendMessage({
+            browserAPI.runtime.sendMessage({
                 action: 'siteGradeUpdated',
                 tabId,
                 domain,
@@ -517,7 +530,7 @@ async function getSiteGrade(url, tabId, forceRefresh = false) {
 
 async function getCurrentTabGrade() {
     try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
         if (!tab?.url) return null;
         const domain = getDomain(tab.url);
         return state.siteGradeCache[domain] || null;
@@ -600,6 +613,121 @@ async function scanOutboundLinks(urls, tabId) {
 }
 
 // ============================================
+// RETROACTIVE HISTORY SCAN
+// ============================================
+
+/**
+ * Checks recent browser history against the threat feeds in one pass -
+ * opt-in only, triggered by a button in the popup. Only ever sends
+ * distinct hostnames (as "https://hostname") to the backend, not full
+ * URLs or page paths, to avoid leaking more of the user's actual browsing
+ * history than necessary for the check.
+ */
+async function scanBrowsingHistory(days = 7) {
+    if (!browserAPI.history) {
+        return { error: 'History permission not available' };
+    }
+
+    const startTime = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    const items = await browserAPI.history.search({
+        text: '',
+        startTime,
+        maxResults: 1000
+    });
+
+    const domains = new Set();
+    for (const item of items) {
+        const domain = getDomain(item.url || '');
+        if (domain && !state.whitelist.includes(domain)) {
+            domains.add(domain);
+        }
+    }
+
+    const targets = [...domains].slice(0, 50).map((d) => `https://${d}`);
+    if (targets.length === 0) {
+        return { success: true, scanned: 0, flagged: [] };
+    }
+
+    const scanResult = await scanOutboundLinksIgnoringModuleToggle(targets);
+
+    const flagged = scanResult.results.filter(
+        (r) => r.risk_level === 'suspicious' || r.risk_level === 'dangerous' || r.is_phishing
+    );
+
+    return {
+        success: true,
+        scanned: targets.length,
+        historyItemsChecked: items.length,
+        flagged
+    };
+}
+
+/**
+ * Same batch-scan mechanics as scanOutboundLinks(), but callable from the
+ * popup's explicit "scan my history" button regardless of whether the
+ * passive link_scanner module is toggled on - this is a separate,
+ * deliberately-triggered action, not passive page scanning.
+ */
+async function scanOutboundLinksIgnoringModuleToggle(urls) {
+    const uniqueUrls = [...new Set(urls)].filter(Boolean).slice(0, 50);
+    if (uniqueUrls.length === 0) {
+        return { success: true, results: [] };
+    }
+
+    const results = [];
+    const toFetch = [];
+
+    for (const url of uniqueUrls) {
+        const cached = state.linkScanCache[url];
+        if (cached) {
+            results.push({ url, ...cached });
+        } else {
+            toFetch.push(url);
+        }
+    }
+
+    if (toFetch.length > 0) {
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (state.apiKey) {
+                headers['X-API-Key'] = state.apiKey;
+            }
+
+            const response = await fetch(`${API_BASE}/batch-scan`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ urls: toFetch })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            for (const item of data.results || []) {
+                const entry = {
+                    is_phishing: item.is_phishing,
+                    risk_score: item.risk_score,
+                    risk_level: item.risk_level,
+                    fetchedAt: Date.now()
+                };
+                state.linkScanCache[item.url] = entry;
+                results.push({ url: item.url, ...entry });
+            }
+
+            await saveLinkScanCache();
+
+        } catch (error) {
+            console.error('History scan error:', error);
+        }
+    }
+
+    return { success: true, results };
+}
+
+// ============================================
 // COMBINED BADGE (risk level + site grade)
 // ============================================
 
@@ -630,8 +758,8 @@ function applyCombinedBadge(tabId, url) {
     const grade = domain ? state.siteGradeCache[domain] : null;
 
     if (grade?.grade && GRADE_BADGE_COLORS[grade.grade]) {
-        chrome.action.setBadgeText({ tabId, text: grade.grade });
-        chrome.action.setBadgeBackgroundColor({ tabId, color: GRADE_BADGE_COLORS[grade.grade] });
+        browserAPI.action.setBadgeText({ tabId, text: grade.grade });
+        browserAPI.action.setBadgeBackgroundColor({ tabId, color: GRADE_BADGE_COLORS[grade.grade] });
         return;
     }
 
@@ -720,7 +848,7 @@ function getDomain(url) {
 
 async function getCurrentTabStatus() {
     try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
         if (tab && state.currentTabStatus[tab.id]) {
             return state.currentTabStatus[tab.id];
         }
@@ -741,7 +869,7 @@ async function checkBackendHealth() {
 }
 
 function notifyContentScript(tabId, result) {
-    chrome.tabs.sendMessage(tabId, {
+    browserAPI.tabs.sendMessage(tabId, {
         action: 'scanResult',
         result
     }).catch(() => { });
@@ -765,8 +893,8 @@ function updateBadge(status) {
     };
 
     const badge = badges[status] || badges.active;
-    chrome.action.setBadgeText({ text: badge.text });
-    chrome.action.setBadgeBackgroundColor({ color: badge.color });
+    browserAPI.action.setBadgeText({ text: badge.text });
+    browserAPI.action.setBadgeBackgroundColor({ color: badge.color });
 }
 
 function updateBadgeForTab(tabId, status) {
@@ -783,8 +911,8 @@ function updateBadgeForTab(tabId, status) {
 
     const badge = badges[status] || { text: '?', color: '#6b7280' };
 
-    chrome.action.setBadgeText({ tabId, text: badge.text });
-    chrome.action.setBadgeBackgroundColor({ tabId, color: badge.color });
+    browserAPI.action.setBadgeText({ tabId, text: badge.text });
+    browserAPI.action.setBadgeBackgroundColor({ tabId, color: badge.color });
 }
 
 // ============================================
@@ -795,7 +923,7 @@ function showPhishingWarning(tabId, analysis) {
     if (!state.settings.preferences.real_time_alerts) return;
 
     // Browser notification
-    chrome.notifications.create(`phishing-${tabId}`, {
+    browserAPI.notifications.create(`phishing-${tabId}`, {
         type: 'basic',
         iconUrl: 'icons/icon-128.png',
         title: '🚨 Phishing Site Detected',
@@ -805,7 +933,7 @@ function showPhishingWarning(tabId, analysis) {
     });
 
     // Inject warning into page
-    chrome.tabs.sendMessage(tabId, {
+    browserAPI.tabs.sendMessage(tabId, {
         action: 'showWarning',
         type: 'danger',
         analysis
@@ -815,7 +943,7 @@ function showPhishingWarning(tabId, analysis) {
 function showSuspiciousWarning(tabId, analysis) {
     if (!state.settings.preferences.real_time_alerts) return;
 
-    chrome.notifications.create(`suspicious-${tabId}`, {
+    browserAPI.notifications.create(`suspicious-${tabId}`, {
         type: 'basic',
         iconUrl: 'icons/icon-128.png',
         title: '⚠️ Suspicious Website',
@@ -823,7 +951,7 @@ function showSuspiciousWarning(tabId, analysis) {
         priority: 1
     });
 
-    chrome.tabs.sendMessage(tabId, {
+    browserAPI.tabs.sendMessage(tabId, {
         action: 'showWarning',
         type: 'warning',
         analysis
