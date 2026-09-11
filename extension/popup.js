@@ -1,9 +1,10 @@
 /**
- * Phishing Guard - Popup Script v2.1
+ * Phishing Guard - Popup Script v2.3
  * Premium UI with protection modules, site grade, and dashboard integration
  */
 
 import { CONFIG } from './config.js';
+import { applyAutoTheme } from './theme.js';
 
 // See background.js for why this one alias is enough for cross-browser support.
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
@@ -68,6 +69,12 @@ let state = {
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
+    // Not awaited deliberately - geolocation can take a couple seconds and
+    // must never delay the rest of the popup becoming usable. Once a
+    // location is cached (after the first successful lookup), this
+    // resolves near-instantly on future opens.
+    applyAutoTheme(browserAPI);
+
     // Load state from background
     const response = await sendMessage({ action: 'getStatus' });
 

@@ -1,5 +1,5 @@
 /**
- * Phishing Guard - Content Script v2.1
+ * Phishing Guard - Content Script v2.3
  * Auto-scans on page load, detects credential access, shows beautiful alerts,
  * flags risky outbound links, and nudges toward stronger new passwords.
  */

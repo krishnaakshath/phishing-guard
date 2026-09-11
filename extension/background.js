@@ -1,5 +1,5 @@
 /**
- * Phishing Guard - Background Service Worker v2.1
+ * Phishing Guard - Background Service Worker v2.3
  * Enhanced monitoring with threat intelligence, settings sync,
  * site security grading, and outbound link scanning
  */
@@ -81,7 +81,7 @@ function ensureStateLoaded() {
 }
 
 browserAPI.runtime.onInstalled.addListener(async () => {
-    console.log('Phishing Guard v2.2 installed');
+    console.log('Phishing Guard v2.3 installed');
     await ensureStateLoaded();
     updateBadge('active');
 });
@@ -991,4 +991,4 @@ function showSuspiciousWarning(tabId, analysis) {
 // STARTUP
 // ============================================
 
-console.log('Phishing Guard v2.1 background worker started');
+console.log('Phishing Guard v2.3 background worker started');

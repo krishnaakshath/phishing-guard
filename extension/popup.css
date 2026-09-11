@@ -1,19 +1,29 @@
 /* ============================================
-   Phishing Guard - Premium Popup Styles v2.0
-   AdGuard-inspired dark theme with glassmorphism
+   Phishing Guard - Popup Styles v2.3
+   Restrained, information-dense security-tool aesthetic (near-black +
+   slate surfaces, semantic green/amber/red doing the work instead of
+   decorative gradients/glow). Auto-switches light/dark based on actual
+   local sunrise/sunset via [data-theme] on <html>, not a fixed clock
+   heuristic - see theme.js.
    ============================================ */
 
 :root {
-    /* Colors */
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-tertiary: #334155;
-    --bg-glass: rgba(30, 41, 59, 0.8);
+    /* Dark theme (default) */
+    --bg-primary: #020617;
+    --bg-secondary: #0e1223;
+    --bg-tertiary: #1a1e2f;
+    --bg-glass: rgba(14, 18, 35, 0.85);
 
-    --text-primary: #f1f5f9;
+    --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
     --text-muted: #64748b;
 
+    --border: #232842;
+    --border-strong: #334155;
+    --overlay-hover: rgba(248, 250, 252, 0.06);
+
+    /* Brand mark accent - used sparingly (logo, one primary CTA), not as
+       a scattered decorative background the way it was before. */
     --accent-primary: #8b5cf6;
     --accent-secondary: #3b82f6;
     --accent-tertiary: #06b6d4;
@@ -41,11 +51,33 @@
     --radius-lg: 16px;
     --radius-xl: 20px;
 
-    /* Shadows */
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
-    --shadow-glow: 0 0 20px rgba(139, 92, 246, 0.3);
+    /* Shadows - functional depth cues, not decorative glow */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.28);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.32);
+    --shadow-glow: 0 2px 8px rgba(139, 92, 246, 0.18);
+}
+
+/* Light theme - applied when theme.js determines it's daytime at the
+   user's location (or as a graceful fallback, local clock time). */
+:root[data-theme="light"] {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --bg-glass: rgba(255, 255, 255, 0.9);
+
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --overlay-hover: rgba(15, 23, 42, 0.04);
+
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.1);
+    --shadow-glow: 0 2px 8px rgba(139, 92, 246, 0.12);
 }
 
 * {
@@ -67,7 +99,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 520px;
-    background: linear-gradient(180deg, var(--bg-primary) 0%, #0c1222 100%);
+    background: var(--bg-primary);
 }
 
 .app.disabled {
@@ -103,7 +135,7 @@ button:focus-visible,
     padding: 16px 20px;
     background: var(--bg-glass);
     backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border);
 }
 
 .logo {
@@ -200,8 +232,7 @@ button:focus-visible,
 }
 
 .master-toggle.active .toggle-track {
-    background: var(--gradient-success);
-    box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+    background: var(--success);
 }
 
 .toggle-thumb {
@@ -252,7 +283,13 @@ button:focus-visible,
 
 .ring-progress {
     fill: none;
-    stroke: url(#shield-gradient);
+    /* Real bug found during this redesign: this used to reference an SVG
+       <linearGradient id="shield-gradient"> that lived in the header logo
+       markup - that markup was replaced with a plain <img> logo, silently
+       breaking this into an unresolvable gradient reference (renders with
+       no visible stroke). A solid token-based color is both the fix and
+       the right call for the calmer, less-decorative direction anyway. */
+    stroke: var(--accent-secondary);
     stroke-width: 6;
     stroke-linecap: round;
     stroke-dasharray: 283;
@@ -562,7 +599,7 @@ button:focus-visible,
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
     text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
 }
 
 .stat-card.threats {
@@ -810,7 +847,7 @@ button:focus-visible,
 .action-btn.full-width {
     width: 100%;
     background: var(--bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
 }
 
 .action-btn.full-width.loading svg {
@@ -907,7 +944,7 @@ button:focus-visible,
     gap: 8px;
     padding: 10px 12px;
     background: var(--bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     color: var(--text-secondary);
     font-size: 11.5px;
@@ -994,7 +1031,7 @@ button:focus-visible,
 
 .footer {
     padding: 12px 20px 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid var(--border);
 }
 
 .footer-btn {
