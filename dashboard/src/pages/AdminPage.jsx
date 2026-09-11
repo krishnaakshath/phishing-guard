@@ -3,8 +3,28 @@ import { useNavigate } from 'react-router-dom'
 import { apiDelete, apiGet, apiPost } from '../api'
 import { useAuth } from '../AuthContext'
 import { AdminIcon } from '../icons'
+import { downloadCsv } from '../csv'
 
 const TABS = ['overview', 'threats', 'users']
+
+const THREAT_COLUMNS = [
+  { label: 'ID', key: 'id' },
+  { label: 'Domain', key: 'domain' },
+  { label: 'Type', key: 'threat_type' },
+  { label: 'Severity', key: 'severity' },
+  { label: 'Reported Count', key: 'reported_count' },
+  { label: 'Verified', value: (r) => (r.verified ? 'yes' : 'no') },
+  { label: 'First Seen', key: 'first_seen' },
+  { label: 'Last Seen', key: 'last_seen' },
+]
+
+const USER_COLUMNS = [
+  { label: 'ID', key: 'id' },
+  { label: 'Email', key: 'email' },
+  { label: 'Role', value: (u) => (u.is_admin ? 'admin' : 'user') },
+  { label: 'Created', key: 'created_at' },
+  { label: 'Last Login', key: 'last_login' },
+]
 
 export default function AdminPage() {
   const { user, logout } = useAuth()
@@ -117,7 +137,17 @@ export default function AdminPage() {
 
         {!loading && tab === 'threats' && (
           <div className="admin-panel">
-            <div className="admin-panel-header">Threat Reports ({threats.length})</div>
+            <div className="admin-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Threat Reports ({threats.length})</span>
+              {threats.length > 0 && (
+                <button
+                  className="admin-btn"
+                  onClick={() => downloadCsv('phishing-guard-threat-reports.csv', threats, THREAT_COLUMNS)}
+                >
+                  Export CSV
+                </button>
+              )}
+            </div>
             <div className="table-container">
               <table className="admin-table">
                 <thead>
@@ -179,7 +209,17 @@ export default function AdminPage() {
 
         {!loading && tab === 'users' && (
           <div className="admin-panel">
-            <div className="admin-panel-header">Users ({users.length})</div>
+            <div className="admin-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Users ({users.length})</span>
+              {users.length > 0 && (
+                <button
+                  className="admin-btn"
+                  onClick={() => downloadCsv('phishing-guard-users.csv', users, USER_COLUMNS)}
+                >
+                  Export CSV
+                </button>
+              )}
+            </div>
             <div className="table-container">
               <table className="admin-table">
                 <thead>

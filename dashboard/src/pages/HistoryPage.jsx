@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { apiGet } from '../api'
 import { HistoryIcon } from '../icons'
+import { downloadCsv } from '../csv'
+
+const HISTORY_COLUMNS = [
+  { label: 'Domain', key: 'domain' },
+  { label: 'URL', key: 'url' },
+  { label: 'Risk Level', key: 'risk_level' },
+  { label: 'Risk Score', key: 'risk_score' },
+  { label: 'Scanned At', key: 'scanned_at' },
+]
 
 export default function HistoryPage() {
   const [history, setHistory] = useState([])
@@ -31,6 +40,14 @@ export default function HistoryPage() {
           <h1 className="page-title">Scan History</h1>
           <p className="page-subtitle">Recent website scans and their results</p>
         </div>
+        {history.length > 0 && (
+          <button
+            className="btn btn-secondary"
+            onClick={() => downloadCsv('phishing-guard-history.csv', history, HISTORY_COLUMNS)}
+          >
+            Export CSV
+          </button>
+        )}
       </header>
 
       {error && <div className="flash-banner danger">{error}</div>}
