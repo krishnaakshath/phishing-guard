@@ -20,7 +20,15 @@
 
     --success: #22c55e;
     --warning: #f59e0b;
+    --suspicious: #f97316;
     --danger: #ef4444;
+
+    /* A-F site security grade scale: green -> lime -> amber -> orange -> red */
+    --grade-a: #22c55e;
+    --grade-b: #84cc16;
+    --grade-c: #f59e0b;
+    --grade-d: #f97316;
+    --grade-f: #ef4444;
 
     --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 50%, #06b6d4 100%);
     --gradient-success: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
@@ -65,6 +73,23 @@ body {
 .app.disabled {
     opacity: 0.7;
     pointer-events: none;
+}
+
+/* Visible keyboard focus on every interactive control - popups are
+   frequently driven by keyboard/extension shortcuts, not just the mouse. */
+button:focus-visible,
+.module-toggle input:focus-visible + .toggle-slider,
+.master-toggle:focus-visible .toggle-track {
+    outline: 2px solid var(--accent-secondary);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 /* ============================================
@@ -242,6 +267,10 @@ body {
     stroke: var(--warning);
 }
 
+.status-ring.suspicious .ring-progress {
+    stroke: var(--suspicious);
+}
+
 .status-ring.danger .ring-progress {
     stroke: var(--danger);
 }
@@ -293,6 +322,10 @@ body {
     fill: var(--warning);
 }
 
+.status-ring.suspicious .status-icon svg {
+    fill: var(--suspicious);
+}
+
 .status-ring.danger .status-icon svg {
     fill: var(--danger);
 }
@@ -318,8 +351,18 @@ body {
     color: var(--warning);
 }
 
+.status-hero.suspicious .status-label {
+    color: var(--suspicious);
+}
+
 .status-hero.danger .status-label {
     color: var(--danger);
+}
+
+.status-domain-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .status-domain {
@@ -329,6 +372,47 @@ body {
     background: var(--bg-tertiary);
     padding: 4px 12px;
     border-radius: var(--radius-sm);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ============================================
+   SITE GRADE CHIP (A-F)
+   ============================================ */
+
+.grade-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.grade-chip-letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    background: var(--bg-tertiary);
+    cursor: default;
+}
+
+.grade-chip[data-grade="A"] .grade-chip-letter { background: var(--grade-a); }
+.grade-chip[data-grade="B"] .grade-chip-letter { background: var(--grade-b); }
+.grade-chip[data-grade="C"] .grade-chip-letter { background: var(--grade-c); }
+.grade-chip[data-grade="D"] .grade-chip-letter { background: var(--grade-d); color: #0f172a; }
+.grade-chip[data-grade="F"] .grade-chip-letter { background: var(--grade-f); color: white; }
+.grade-chip[data-grade="loading"] .grade-chip-letter {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    font-size: 10px;
 }
 
 /* ============================================
@@ -375,14 +459,24 @@ body {
 }
 
 .module-icon {
-    font-size: 20px;
     width: 32px;
     height: 32px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
+    color: var(--accent-secondary);
+}
+
+.module-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+.module-card:not(.active) .module-icon {
+    color: var(--text-muted);
 }
 
 .module-info {
@@ -690,6 +784,48 @@ body {
 .history-row .h-time {
     font-size: 10px;
     color: var(--text-muted);
+}
+
+/* ============================================
+   SECURITY TOOLS (dashboard links)
+   ============================================ */
+
+.tools-section {
+    padding: 0 20px 16px;
+}
+
+.tools-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.tool-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tool-link svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    color: var(--accent-tertiary);
+}
+
+.tool-link:hover {
+    border-color: rgba(6, 182, 212, 0.35);
+    color: var(--text-primary);
+    transform: translateY(-1px);
 }
 
 /* ============================================

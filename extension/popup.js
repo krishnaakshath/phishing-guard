@@ -1,9 +1,9 @@
 /**
- * Phishing Guard - Popup Script v2.0
- * Premium UI with protection modules and dashboard integration
+ * Phishing Guard - Popup Script v2.1
+ * Premium UI with protection modules, site grade, and dashboard integration
  */
 
-const API_BASE = 'https://phishing-guard.onrender.com/api';
+import { CONFIG } from './config.js';
 
 // UI Elements
 const elements = {
@@ -15,6 +15,8 @@ const elements = {
     statusIcon: document.getElementById('status-icon'),
     statusLabel: document.getElementById('status-label'),
     statusDomain: document.getElementById('status-domain'),
+    gradeChip: document.getElementById('grade-chip'),
+    gradeChipLetter: document.getElementById('grade-chip-letter'),
     statScans: document.getElementById('stat-scans'),
     statThreats: document.getElementById('stat-threats'),
     statUptime: document.getElementById('stat-uptime'),
@@ -26,7 +28,9 @@ const elements = {
     historyList: document.getElementById('history-list'),
     seeAllBtn: document.getElementById('see-all-btn'),
     backendIndicator: document.getElementById('backend-indicator'),
-    dashboardBtn: document.getElementById('dashboard-btn')
+    dashboardBtn: document.getElementById('dashboard-btn'),
+    passwordCheckerLink: document.getElementById('password-checker-link'),
+    siteScannerLink: document.getElementById('site-scanner-link')
 };
 
 // State
@@ -64,11 +68,31 @@ async function init() {
     updateProtectionToggle();
     updateStats();
     await updateCurrentSite();
+    if (response?.siteGrade) {
+        updateGradeChip(response.siteGrade);
+    } else if (state.currentUrl) {
+        // Not cached yet (e.g. the tab loaded before this session started) -
+        // ask the background to fetch it now rather than waiting forever
+        // for a navigation event that already happened.
+        updateGradeChip(null, /* loading */ true);
+        sendMessage({ action: 'getSiteGrade', url: state.currentUrl }).then((grade) => {
+            if (grade && !grade.error) updateGradeChip(grade);
+            else updateGradeChip(null);
+        });
+    }
     await loadHistory();
     await checkBackend();
 
     // Setup event listeners
     setupEventListeners();
+
+    // Background broadcasts this once a slow /site-scan finishes - pick it
+    // up if it lands while the popup happens to be open.
+    chrome.runtime.onMessage.addListener((message) => {
+        if (message?.action === 'siteGradeUpdated' && message.domain === state.currentDomain) {
+            updateGradeChip(message.siteGrade);
+        }
+    });
 }
 
 function setupEventListeners() {
@@ -89,6 +113,10 @@ function setupEventListeners() {
     elements.settingsBtn?.addEventListener('click', openDashboard);
     elements.dashboardBtn?.addEventListener('click', openDashboard);
     elements.seeAllBtn?.addEventListener('click', openDashboard);
+
+    // Public security tools
+    elements.passwordCheckerLink?.addEventListener('click', openPasswordChecker);
+    elements.siteScannerLink?.addEventListener('click', openSiteScanner);
 }
 
 // ============================================
@@ -225,7 +253,7 @@ function updateScanResult(result) {
         showThreats(warnings, threat_intel);
     } else if (risk_level === 'suspicious') {
         elements.statusLabel.textContent = 'Suspicious';
-        setStatusRing('warning');
+        setStatusRing('suspicious');
         showThreats(warnings, threat_intel);
     } else if (risk_level === 'dangerous') {
         elements.statusLabel.textContent = 'Dangerous';
@@ -364,8 +392,8 @@ function getThreatIconByType(type) {
 }
 
 function setStatusRing(status) {
-    elements.statusRing?.classList.remove('safe', 'warning', 'danger', 'scanning');
-    elements.statusHero?.classList.remove('safe', 'warning', 'danger');
+    elements.statusRing?.classList.remove('safe', 'warning', 'suspicious', 'danger', 'scanning');
+    elements.statusHero?.classList.remove('safe', 'warning', 'suspicious', 'danger');
 
     if (status) {
         elements.statusRing?.classList.add(status);
@@ -376,6 +404,7 @@ function setStatusRing(status) {
     const icons = {
         safe: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>',
         warning: '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>',
+        suspicious: '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>',
         danger: '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>',
         scanning: '<path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4.01 7.58 4.01 12C4.01 16.42 7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z"/>'
     };
@@ -515,10 +544,48 @@ async function checkBackend() {
 // ============================================
 
 function openDashboard() {
-    // Open dashboard in new tab - Production URL
-    chrome.tabs.create({
-        url: 'https://phishing-guard-seven.vercel.app'
-    });
+    chrome.tabs.create({ url: CONFIG.DASHBOARD_URL });
+}
+
+function openPasswordChecker() {
+    chrome.tabs.create({ url: `${CONFIG.DASHBOARD_URL}/tools/password-checker` });
+}
+
+function openSiteScanner() {
+    // Prefill with the current tab's domain when we have one, so the user
+    // lands on a scan already in progress for the site they were just on.
+    const url = new URL(`${CONFIG.DASHBOARD_URL}/tools/site-scanner`);
+    if (state.currentDomain) {
+        url.searchParams.set('url', state.currentDomain);
+    }
+    chrome.tabs.create({ url: url.href });
+}
+
+// ============================================
+// SITE SECURITY GRADE
+// ============================================
+
+function updateGradeChip(siteGrade, loading = false) {
+    if (!elements.gradeChip || !elements.gradeChipLetter) return;
+
+    if (loading) {
+        elements.gradeChip.style.display = 'inline-flex';
+        elements.gradeChip.dataset.grade = 'loading';
+        elements.gradeChip.title = 'Checking site security grade…';
+        elements.gradeChipLetter.textContent = '·';
+        return;
+    }
+
+    if (!siteGrade?.grade) {
+        elements.gradeChip.style.display = 'none';
+        return;
+    }
+
+    elements.gradeChip.style.display = 'inline-flex';
+    elements.gradeChip.dataset.grade = siteGrade.grade;
+    elements.gradeChipLetter.textContent = siteGrade.grade;
+    const scoreText = siteGrade.score !== undefined ? ` (${siteGrade.score}/100)` : '';
+    elements.gradeChip.title = `Site security grade: ${siteGrade.grade}${scoreText}`;
 }
 
 // ============================================

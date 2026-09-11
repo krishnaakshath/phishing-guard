@@ -29,7 +29,7 @@
         </div>
         <div class="logo-text">
           <span class="logo-name">Phishing Guard</span>
-          <span class="logo-version">Pro v2.0</span>
+          <span class="logo-version">Pro v2.1</span>
         </div>
       </div>
       <div class="header-actions">
@@ -62,7 +62,12 @@
       </div>
       <div class="status-info">
         <span class="status-label" id="status-label">Protected</span>
-        <span class="status-domain" id="status-domain">Loading...</span>
+        <div class="status-domain-row">
+          <span class="status-domain" id="status-domain">Loading...</span>
+          <span class="grade-chip" id="grade-chip" title="Site security grade" style="display: none;">
+            <span class="grade-chip-letter" id="grade-chip-letter">–</span>
+          </span>
+        </div>
       </div>
     </section>
 
@@ -71,7 +76,11 @@
       <h3 class="section-title">Protection Modules</h3>
       <div class="modules-grid">
         <div class="module-card active" data-module="phishing">
-          <div class="module-icon">🛡️</div>
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2L3 7V12C3 17.55 6.84 22.74 12 24C17.16 22.74 21 17.55 21 12V7L12 2ZM10 17L6 13L7.41 11.59L10 14.17L16.59 7.58L18 9L10 17Z" />
+            </svg>
+          </div>
           <div class="module-info">
             <span class="module-name">Phishing</span>
             <span class="module-status">Active</span>
@@ -82,7 +91,11 @@
           </label>
         </div>
         <div class="module-card active" data-module="password">
-          <div class="module-icon">🔐</div>
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
+            </svg>
+          </div>
           <div class="module-info">
             <span class="module-name">Password</span>
             <span class="module-status">Active</span>
@@ -93,7 +106,11 @@
           </label>
         </div>
         <div class="module-card active" data-module="payment">
-          <div class="module-icon">💳</div>
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
+            </svg>
+          </div>
           <div class="module-info">
             <span class="module-name">Payment</span>
             <span class="module-status">Active</span>
@@ -104,7 +121,11 @@
           </label>
         </div>
         <div class="module-card active" data-module="links">
-          <div class="module-icon">🔗</div>
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
+            </svg>
+          </div>
           <div class="module-info">
             <span class="module-name">Link Scan</span>
             <span class="module-status">Active</span>
@@ -180,6 +201,25 @@
       </div>
     </section>
 
+    <!-- Public Security Tools -->
+    <section class="tools-section">
+      <h3 class="section-title">Security Tools</h3>
+      <div class="tools-grid">
+        <button class="tool-link" id="password-checker-link">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
+          </svg>
+          <span>Password Checker</span>
+        </button>
+        <button class="tool-link" id="site-scanner-link">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
+          </svg>
+          <span>Site Scanner</span>
+        </button>
+      </div>
+    </section>
+
     <!-- Backend Status -->
     <section class="backend-section" id="backend-section">
       <div class="backend-indicator" id="backend-indicator">
@@ -199,7 +239,7 @@
     </footer>
   </div>
 
-  <script src="popup.js"></script>
+  <script type="module" src="popup.js"></script>
 </body>
 
 </html>
