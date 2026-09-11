@@ -62,11 +62,18 @@ def init_database():
             real_time_alerts BOOLEAN DEFAULT 1,
             auto_block_dangerous BOOLEAN DEFAULT 1,
             notification_sound BOOLEAN DEFAULT 0,
-            dark_mode BOOLEAN DEFAULT 1,
+            theme_mode TEXT DEFAULT 'auto',
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
+
+    # Older databases had a boolean dark_mode column instead of the 3-state
+    # theme_mode ('auto'/'light'/'dark') - add the new column if missing.
+    cursor.execute("PRAGMA table_info(user_settings)")
+    settings_columns = {row[1] for row in cursor.fetchall()}
+    if 'theme_mode' not in settings_columns:
+        cursor.execute("ALTER TABLE user_settings ADD COLUMN theme_mode TEXT DEFAULT 'auto'")
     
     # Whitelist table
     cursor.execute('''
@@ -389,10 +396,10 @@ def get_user_settings(user_id: int) -> Dict:
                 'real_time_alerts': bool(settings['real_time_alerts']),
                 'auto_block_dangerous': bool(settings['auto_block_dangerous']),
                 'notification_sound': bool(settings['notification_sound']),
-                'dark_mode': bool(settings['dark_mode'])
+                'theme_mode': settings['theme_mode'] or 'auto'
             }
         }
-    
+
     # Return defaults
     return {
         'protection_level': 'medium',
@@ -406,7 +413,7 @@ def get_user_settings(user_id: int) -> Dict:
             'real_time_alerts': True,
             'auto_block_dangerous': True,
             'notification_sound': False,
-            'dark_mode': True
+            'theme_mode': 'auto'
         }
     }
 
@@ -421,9 +428,9 @@ def update_user_settings(user_id: int, settings: Dict) -> bool:
         preferences = settings.get('preferences', {})
         
         cursor.execute('''
-            INSERT INTO user_settings (user_id, protection_level, 
+            INSERT INTO user_settings (user_id, protection_level,
                 phishing_protection, password_guard, payment_protection, link_scanner,
-                real_time_alerts, auto_block_dangerous, notification_sound, dark_mode)
+                real_time_alerts, auto_block_dangerous, notification_sound, theme_mode)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 protection_level = excluded.protection_level,
@@ -434,7 +441,7 @@ def update_user_settings(user_id: int, settings: Dict) -> bool:
                 real_time_alerts = excluded.real_time_alerts,
                 auto_block_dangerous = excluded.auto_block_dangerous,
                 notification_sound = excluded.notification_sound,
-                dark_mode = excluded.dark_mode,
+                theme_mode = excluded.theme_mode,
                 updated_at = CURRENT_TIMESTAMP
         ''', (
             user_id,
@@ -446,7 +453,7 @@ def update_user_settings(user_id: int, settings: Dict) -> bool:
             preferences.get('real_time_alerts', True),
             preferences.get('auto_block_dangerous', True),
             preferences.get('notification_sound', False),
-            preferences.get('dark_mode', True)
+            preferences.get('theme_mode', 'auto')
         ))
         
         conn.commit()
