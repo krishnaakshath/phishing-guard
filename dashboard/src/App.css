@@ -1,6 +1,4 @@
-/* App-specific styles */
+/* App-level layout glue. Component styles live in theme.css. */
 .App {
   min-height: 100vh;
 }
-
-/* Additional component styles can go here */
