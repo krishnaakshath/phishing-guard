@@ -4,16 +4,21 @@ Real-time threat intelligence, reputation scoring, and blocklist management
 """
 
 import hashlib
+import json
 import logging
 import os
 import time
 from datetime import datetime, timedelta
+from io import BytesIO
 from typing import Dict, List, Optional, Tuple
 import re
 import socket
 import ssl
 import requests
 from urllib.parse import urlparse
+
+import imagehash
+from PIL import Image
 
 import cache
 
@@ -87,6 +92,64 @@ def check_openphish(url: str) -> bool:
     """Check a URL against the cached OpenPhish community feed."""
     feed = _get_openphish_feed()
     return url in feed or url.rstrip('/') in feed
+
+
+# Perceptual-hash-based favicon impersonation check. KNOWN_FAVICON_HASHES is
+# static data checked into the repo (see scripts/generate_favicon_hashes.py)
+# - real pHashes fetched from each brand's actual live favicon, not
+# fabricated. Distance <= FAVICON_HASH_THRESHOLD is treated as "visually
+# the same icon" (pHash literature typically uses ~10 as the same-image
+# cutoff for a 64-bit hash; 10 is intentionally conservative here to avoid
+# false positives on legitimately similar-but-different icons).
+FAVICON_HASH_THRESHOLD = 10
+_KNOWN_FAVICONS_PATH = os.path.join(os.path.dirname(__file__), 'known_favicons.json')
+
+
+def _load_known_favicon_hashes() -> Dict[str, 'imagehash.ImageHash']:
+    try:
+        with open(_KNOWN_FAVICONS_PATH) as f:
+            raw = json.load(f)
+        return {domain: imagehash.hex_to_hash(hex_hash) for domain, hex_hash in raw.items()}
+    except Exception as e:
+        logger.warning(f"Could not load known_favicons.json: {e}")
+        return {}
+
+
+KNOWN_FAVICON_HASHES = _load_known_favicon_hashes()
+
+
+def check_favicon_hash(domain: str) -> Optional[Dict]:
+    """
+    Fetch a domain's favicon and compare it against a small set of known
+    brand favicon hashes. Flags likely impersonation: a site whose icon is
+    visually identical to a trusted brand's icon, but isn't that brand's
+    own domain. Returns None (no signal) on any failure - a missing or
+    unparseable favicon is common and not itself suspicious.
+    """
+    if not KNOWN_FAVICON_HASHES or domain in KNOWN_FAVICON_HASHES:
+        return None
+
+    try:
+        resp = requests.get(f'https://{domain}/favicon.ico', timeout=5,
+                             headers={'User-Agent': 'Mozilla/5.0 (PhishingGuard)'})
+        resp.raise_for_status()
+        target_hash = imagehash.phash(Image.open(BytesIO(resp.content)))
+    except Exception:
+        return None
+
+    best_match, best_distance = None, None
+    for brand_domain, brand_hash in KNOWN_FAVICON_HASHES.items():
+        distance = target_hash - brand_hash
+        if best_distance is None or distance < best_distance:
+            best_match, best_distance = brand_domain, distance
+
+    if best_match is not None and best_distance <= FAVICON_HASH_THRESHOLD:
+        return {
+            'impersonating': best_match,
+            'distance': int(best_distance)
+        }
+
+    return None
 
 # ============================================
 # THREAT INTELLIGENCE DATABASES
@@ -443,6 +506,19 @@ class ThreatIntelligence:
                 reputation['reputation_score'] = max(0, reputation['reputation_score'] - 50)
                 reputation['threat_types'].append('known_phishing_feed')
                 reputation['checks_performed'].append('openphish_feed')
+
+            favicon_cache_key = f"favicon_match:{domain}"
+            favicon_result = cache.get_cached(favicon_cache_key, DOMAIN_INTEL_CACHE_TTL)
+            if favicon_result is None:
+                favicon_result = check_favicon_hash(domain) or {}
+                cache.set_cached(favicon_cache_key, favicon_result)
+            if favicon_result and favicon_result.get('impersonating'):
+                reputation['risk_factors'].append(
+                    f"Favicon visually matches {favicon_result['impersonating']} but domain doesn't"
+                )
+                reputation['reputation_score'] = max(0, reputation['reputation_score'] - 45)
+                reputation['threat_types'].append('favicon_impersonation')
+                reputation['checks_performed'].append('favicon_hash')
 
             result = {
                 'url': url,

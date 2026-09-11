@@ -41,7 +41,7 @@
 |---|---|
 | `backend/app.py` | Flask routes, auth middleware, rate limiting, CORS |
 | `backend/detector.py` | Local URL heuristics (TLD, keywords, typosquat patterns) |
-| `backend/threat_intel.py` | Domain reputation, WHOIS/SSL checks (cached), Safe Browsing, OpenPhish feed |
+| `backend/threat_intel.py` | Domain reputation, WHOIS/SSL checks (cached), Safe Browsing, OpenPhish feed, favicon impersonation (perceptual hash vs. `known_favicons.json`) |
 | `backend/security_grade.py` | Security header / TLS / cookie posture grading (A–F) |
 | `backend/breach_check.py` | Password breach checking via HIBP k-anonymity |
 | `backend/secret_scanner.py` | Regex-based exposed-secret detection in page HTML |

@@ -4,6 +4,8 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import imagehash
+
 import cache
 import models
 import threat_intel
@@ -60,3 +62,46 @@ def test_check_domain_reputation_caches_domain_age_lookup():
 
         cached = cache.get_cached(f'domain_age:{domain}', threat_intel.DOMAIN_INTEL_CACHE_TTL)
         assert cached == {'age_days': 500}
+
+
+def test_check_favicon_hash_skips_known_brand_domain():
+    known_domain = next(iter(threat_intel.KNOWN_FAVICON_HASHES))
+    assert threat_intel.check_favicon_hash(known_domain) is None
+
+
+def test_check_favicon_hash_flags_visual_match_on_unrelated_domain():
+    brand_domain, brand_hash = next(iter(threat_intel.KNOWN_FAVICON_HASHES.items()))
+    fake_resp = MagicMock()
+    fake_resp.content = b'not-a-real-image-but-mocked-below'
+    fake_resp.raise_for_status.return_value = None
+
+    with patch('threat_intel.requests.get', return_value=fake_resp), \
+         patch('threat_intel.Image.open'), \
+         patch('threat_intel.imagehash.phash', return_value=brand_hash):
+        result = threat_intel.check_favicon_hash('totally-unrelated-domain.example')
+
+    assert result is not None
+    assert result['impersonating'] == brand_domain
+    assert result['distance'] == 0
+
+
+def test_check_favicon_hash_no_match_for_dissimilar_icon():
+    brand_domain, brand_hash = next(iter(threat_intel.KNOWN_FAVICON_HASHES.items()))
+    # Flip every bit - guaranteed maximum Hamming distance, well above threshold
+    far_hash = imagehash.ImageHash(~brand_hash.hash)
+
+    fake_resp = MagicMock()
+    fake_resp.content = b'not-a-real-image-but-mocked-below'
+    fake_resp.raise_for_status.return_value = None
+
+    with patch('threat_intel.requests.get', return_value=fake_resp), \
+         patch('threat_intel.Image.open'), \
+         patch('threat_intel.imagehash.phash', return_value=far_hash):
+        result = threat_intel.check_favicon_hash('some-other-domain.example')
+
+    assert result is None
+
+
+def test_check_favicon_hash_returns_none_on_fetch_failure():
+    with patch('threat_intel.requests.get', side_effect=Exception('connection refused')):
+        assert threat_intel.check_favicon_hash('unreachable-domain.example') is None

@@ -26,6 +26,7 @@ threats.
 | Feature | Where | Notes |
 |---|---|---|
 | Real-time phishing detection | Extension + backend | Local heuristics + Safe Browsing + OpenPhish feed |
+| Favicon impersonation detection | Backend | Perceptual-hash match against known brand icons on an unrelated domain (`known_favicons.json`, regenerate via `backend/scripts/generate_favicon_hashes.py`) |
 | Credential-entry protection | Extension | Warns before password/card/OTP entry on risky sites |
 | Site security grade (A–F) | Extension + `/tools/site-scanner` | Headers, TLS, cookie flags — shareable, no login needed |
 | Exposed secret/API key scan | `/tools/site-scanner` | Flags leaked keys/tokens in a site's client-side code |
