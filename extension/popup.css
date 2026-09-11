@@ -145,18 +145,17 @@ button:focus-visible,
 }
 
 .logo-icon {
-    width: 36px;
-    height: 36px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .logo-icon img {
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     display: block;
-    filter: drop-shadow(0 2px 4px rgba(139, 92, 246, 0.3));
 }
 
 .logo-text {
@@ -178,37 +177,6 @@ button:focus-visible,
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 1px;
-}
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.icon-btn {
-    width: 36px;
-    height: 36px;
-    border: none;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.icon-btn:hover {
-    background: var(--accent-primary);
-    color: white;
-    transform: scale(1.05);
-}
-
-.icon-btn svg {
-    width: 18px;
-    height: 18px;
 }
 
 /* Master Toggle */
@@ -252,165 +220,74 @@ button:focus-visible,
 }
 
 /* ============================================
-   STATUS HERO
+   STATUS BAR
+   Plain text status pill + domain - color and label carry the meaning,
+   no ring/icon graphics. Matches the rest of the popup's restrained,
+   data-first direction.
    ============================================ */
 
-.status-hero {
+.status-bar {
     display: flex;
     flex-direction: column;
+    gap: 8px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.status-row {
+    display: flex;
     align-items: center;
-    padding: 24px 20px;
-    gap: 16px;
+    justify-content: space-between;
+    gap: 8px;
 }
 
-.status-ring {
-    position: relative;
-    width: 100px;
-    height: 100px;
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-strong);
 }
 
-.ring-svg {
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-}
-
-.ring-bg {
-    fill: none;
-    stroke: var(--bg-tertiary);
-    stroke-width: 6;
-}
-
-.ring-progress {
-    fill: none;
-    /* Real bug found during this redesign: this used to reference an SVG
-       <linearGradient id="shield-gradient"> that lived in the header logo
-       markup - that markup was replaced with a plain <img> logo, silently
-       breaking this into an unresolvable gradient reference (renders with
-       no visible stroke). A solid token-based color is both the fix and
-       the right call for the calmer, less-decorative direction anyway. */
-    stroke: var(--accent-secondary);
-    stroke-width: 6;
-    stroke-linecap: round;
-    stroke-dasharray: 283;
-    stroke-dashoffset: 0;
-    transition: stroke-dashoffset 0.5s ease;
-}
-
-.status-ring.safe .ring-progress {
-    stroke: var(--success);
-}
-
-.status-ring.warning .ring-progress {
-    stroke: var(--warning);
-}
-
-.status-ring.suspicious .ring-progress {
-    stroke: var(--suspicious);
-}
-
-.status-ring.danger .ring-progress {
-    stroke: var(--danger);
-}
-
-.status-ring.scanning .ring-progress {
-    animation: scanning 1.5s linear infinite;
-}
-
-@keyframes scanning {
-    0% {
-        stroke-dashoffset: 0;
-    }
-
-    50% {
-        stroke-dashoffset: 141;
-    }
-
-    100% {
-        stroke-dashoffset: 283;
-    }
-}
-
-.status-icon {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 48px;
-    height: 48px;
-    background: var(--bg-secondary);
+.status-pill::before {
+    content: '';
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow-md);
+    background: var(--success);
 }
 
-.status-icon svg {
-    width: 28px;
-    height: 28px;
-    fill: var(--success);
+.status-pill.safe::before { background: var(--success); }
+.status-pill.warning::before { background: var(--warning); }
+.status-pill.suspicious::before { background: var(--suspicious); }
+.status-pill.danger::before { background: var(--danger); }
+.status-pill.scanning::before {
+    background: var(--accent-secondary);
+    animation: pulse-dot 1s ease-in-out infinite;
 }
 
-.status-ring.safe .status-icon svg {
-    fill: var(--success);
-}
-
-.status-ring.warning .status-icon svg {
-    fill: var(--warning);
-}
-
-.status-ring.suspicious .status-icon svg {
-    fill: var(--suspicious);
-}
-
-.status-ring.danger .status-icon svg {
-    fill: var(--danger);
-}
-
-.status-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
 }
 
 .status-label {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--success);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
-.status-hero.safe .status-label {
-    color: var(--success);
-}
-
-.status-hero.warning .status-label {
-    color: var(--warning);
-}
-
-.status-hero.suspicious .status-label {
-    color: var(--suspicious);
-}
-
-.status-hero.danger .status-label {
-    color: var(--danger);
-}
-
-.status-domain-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
+.status-pill.safe .status-label { color: var(--success); }
+.status-pill.warning .status-label { color: var(--warning); }
+.status-pill.suspicious .status-label { color: var(--suspicious); }
+.status-pill.danger .status-label { color: var(--danger); }
 
 .status-domain {
     font-size: 13px;
     color: var(--text-secondary);
     font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-    background: var(--bg-tertiary);
-    padding: 4px 12px;
-    border-radius: var(--radius-sm);
-    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -470,73 +347,47 @@ button:focus-visible,
     margin-bottom: 12px;
 }
 
-.modules-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-.module-card {
+.modules-list {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px;
-    background: var(--bg-secondary);
+    flex-direction: column;
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    border: 1px solid transparent;
-    transition: all 0.2s ease;
+    overflow: hidden;
 }
 
-.module-card:hover {
-    border-color: rgba(139, 92, 246, 0.3);
-    transform: translateY(-1px);
-}
-
-.module-card.active {
-    border-color: rgba(34, 197, 94, 0.2);
-}
-
-.module-icon {
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
+.module-row {
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-sm);
-    color: var(--accent-secondary);
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
 }
 
-.module-icon svg {
-    width: 17px;
-    height: 17px;
-}
-
-.module-card:not(.active) .module-icon {
-    color: var(--text-muted);
+.module-row:last-child {
+    border-bottom: none;
 }
 
 .module-info {
-    flex: 1;
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: baseline;
+    gap: 8px;
     min-width: 0;
 }
 
 .module-name {
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 600;
     color: var(--text-primary);
 }
 
 .module-status {
-    font-size: 10px;
+    font-size: 10.5px;
     color: var(--success);
 }
 
-.module-card:not(.active) .module-status {
+.module-row:not(.active) .module-status {
     color: var(--text-muted);
 }
 
@@ -657,43 +508,33 @@ button:focus-visible,
     border: 1px solid transparent;
 }
 
-.action-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
 .action-btn:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
-    transform: translateY(-1px);
 }
 
 .action-btn.primary {
-    background: var(--gradient-primary);
+    background: var(--accent-secondary);
     color: white;
     flex: 1.5;
 }
 
 .action-btn.primary:hover {
-    box-shadow: var(--shadow-glow);
-    transform: translateY(-2px);
+    background: #2563eb;
 }
 
 .action-btn.primary.loading {
     pointer-events: none;
+    animation: pulse-text 1s ease-in-out infinite;
 }
 
-.action-btn.primary.loading svg {
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
+@keyframes pulse-text {
+    0%, 100% {
+        opacity: 1;
     }
 
-    to {
-        transform: rotate(360deg);
+    50% {
+        opacity: 0.6;
     }
 }
 
@@ -762,16 +603,6 @@ button:focus-visible,
     padding: 24px;
     color: var(--text-muted);
     font-size: 12px;
-}
-
-.empty-icon {
-    display: flex;
-    opacity: 0.5;
-}
-
-.empty-icon svg {
-    width: 24px;
-    height: 24px;
 }
 
 .history-row {
@@ -850,8 +681,9 @@ button:focus-visible,
     border: 1px solid var(--border);
 }
 
-.action-btn.full-width.loading svg {
-    animation: spin 1s linear infinite;
+.action-btn.full-width.loading {
+    pointer-events: none;
+    animation: pulse-text 1s ease-in-out infinite;
 }
 
 .history-scan-results {
@@ -932,16 +764,13 @@ button:focus-visible,
     padding: 0 20px 16px;
 }
 
-.tools-grid {
+.tools-list {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 8px;
 }
 
 .tool-link {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     padding: 10px 12px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
@@ -950,20 +779,13 @@ button:focus-visible,
     font-size: 11.5px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.tool-link svg {
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
-    color: var(--accent-tertiary);
+    text-align: center;
+    transition: all 0.15s ease;
 }
 
 .tool-link:hover {
-    border-color: rgba(6, 182, 212, 0.35);
+    border-color: var(--border-strong);
     color: var(--text-primary);
-    transform: translateY(-1px);
 }
 
 /* ============================================
@@ -1036,31 +858,20 @@ button:focus-visible,
 
 .footer-btn {
     width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px;
+    padding: 10px;
     background: var(--bg-secondary);
-    border: 1px solid rgba(139, 92, 246, 0.3);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    color: var(--accent-primary);
-    font-size: 13px;
+    color: var(--text-secondary);
+    font-size: 12.5px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.footer-btn svg {
-    width: 18px;
-    height: 18px;
+    transition: all 0.15s ease;
 }
 
 .footer-btn:hover {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
-    box-shadow: var(--shadow-glow);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
 }
 
 /* ============================================
@@ -1131,18 +942,6 @@ button:focus-visible,
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid rgba(239, 68, 68, 0.2);
     border-radius: var(--radius-md);
-}
-
-.threat-icon {
-    width: 36px;
-    height: 36px;
-    background: rgba(239, 68, 68, 0.2);
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--danger);
-    flex-shrink: 0;
 }
 
 .threat-info {

@@ -9,20 +9,12 @@ import { applyAutoTheme } from './theme.js';
 // See background.js for why this one alias is enough for cross-browser support.
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
-// Reusable inline SVG icons - kept as plain SVG (not emoji) so every icon
-// in this popup renders consistently across OS/fonts and matches the
-// brand's single-color iconography instead of mixing in platform emoji.
-const WARNING_ICON_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
-const HISTORY_ICON_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>';
-
 // UI Elements
 const elements = {
     app: document.getElementById('app'),
     protectionToggle: document.getElementById('protection-toggle'),
-    settingsBtn: document.getElementById('settings-btn'),
     statusHero: document.getElementById('status-hero'),
-    statusRing: document.getElementById('status-ring'),
-    statusIcon: document.getElementById('status-icon'),
+    statusPill: document.getElementById('status-pill'),
     statusLabel: document.getElementById('status-label'),
     statusDomain: document.getElementById('status-domain'),
     gradeChip: document.getElementById('grade-chip'),
@@ -128,8 +120,7 @@ function setupEventListeners() {
         toggle.addEventListener('change', handleModuleToggle);
     });
 
-    // Settings/Dashboard buttons
-    elements.settingsBtn?.addEventListener('click', openDashboard);
+    // Dashboard buttons
     elements.dashboardBtn?.addEventListener('click', openDashboard);
     elements.seeAllBtn?.addEventListener('click', openDashboard);
 
@@ -161,7 +152,7 @@ function updateProtectionToggle() {
         elements.protectionToggle?.classList.remove('active');
         elements.app?.classList.add('disabled');
         elements.statusLabel.textContent = 'Disabled';
-        elements.statusRing?.classList.remove('safe', 'warning', 'danger');
+        setStatusPill(null);
     }
 }
 
@@ -218,7 +209,7 @@ async function updateCurrentSite() {
         if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
             elements.statusDomain.textContent = 'Browser page';
             elements.statusLabel.textContent = 'Protected';
-            setStatusRing('safe');
+            setStatusPill('safe');
             return;
         }
 
@@ -238,7 +229,7 @@ async function updateCurrentSite() {
             updateScanResult(status.currentTab);
         } else {
             elements.statusLabel.textContent = 'Monitoring';
-            setStatusRing('safe');
+            setStatusPill('safe');
         }
 
     } catch (e) {
@@ -249,7 +240,7 @@ async function updateCurrentSite() {
 async function rescanCurrentSite() {
     elements.rescanBtn?.classList.add('loading');
     elements.statusLabel.textContent = 'Scanning...';
-    setStatusRing('scanning');
+    setStatusPill('scanning');
 
     const response = await sendMessage({ action: 'scanCurrentTab' });
 
@@ -267,33 +258,27 @@ function updateScanResult(result) {
     // Update status text
     if (risk_level === 'safe') {
         elements.statusLabel.textContent = 'Protected';
-        setStatusRing('safe');
+        setStatusPill('safe');
         hideThreats();
     } else if (risk_level === 'warning') {
         elements.statusLabel.textContent = 'Caution';
-        setStatusRing('warning');
+        setStatusPill('warning');
         showThreats(warnings, threat_intel);
     } else if (risk_level === 'suspicious') {
         elements.statusLabel.textContent = 'Suspicious';
-        setStatusRing('suspicious');
+        setStatusPill('suspicious');
         showThreats(warnings, threat_intel);
     } else if (risk_level === 'dangerous') {
         elements.statusLabel.textContent = 'Dangerous';
-        setStatusRing('danger');
+        setStatusPill('danger');
         showThreats(warnings, threat_intel);
     } else {
         elements.statusLabel.textContent = 'Monitoring';
-        setStatusRing('safe');
+        setStatusPill('safe');
         hideThreats();
     }
 
-    // Update ring progress based on risk score
-    const progress = elements.statusRing?.querySelector('.ring-progress');
-    if (progress && risk_score !== undefined) {
-        const safeScore = 100 - risk_score;
-        const offset = 283 - (283 * safeScore / 100);
-        progress.style.strokeDashoffset = offset;
-    }
+    void risk_score; // no longer visualized as a ring - risk_level + the threats list already convey severity
 }
 
 function showThreats(warnings, threatIntel) {
@@ -307,8 +292,7 @@ function showThreats(warnings, threatIntel) {
             threats.push({
                 type: getThreatType(warning),
                 description: warning,
-                severity: getThreatSeverity(warning),
-                icon: getThreatIcon(warning)
+                severity: getThreatSeverity(warning)
             });
         });
     }
@@ -320,8 +304,7 @@ function showThreats(warnings, threatIntel) {
                 threats.push({
                     type: formatThreatType(type),
                     description: getThreatDescription(type),
-                    severity: 'high',
-                    icon: getThreatIconByType(type)
+                    severity: 'high'
                 });
             }
         });
@@ -334,7 +317,6 @@ function showThreats(warnings, threatIntel) {
 
     elements.threatsList.innerHTML = threats.map(threat => `
         <div class="threat-item">
-            <div class="threat-icon">${threat.icon}</div>
             <div class="threat-info">
                 <div class="threat-type">${threat.type}</div>
                 <div class="threat-desc">${threat.description}</div>
@@ -374,13 +356,6 @@ function getThreatSeverity(warning) {
     return 'low';
 }
 
-function getThreatIcon() {
-    // Severity is already conveyed by the badge text and tinted background,
-    // so a single consistent icon (rather than a different emoji per
-    // category) keeps this visually aligned with the rest of the popup.
-    return WARNING_ICON_SVG;
-}
-
 function formatThreatType(type) {
     return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
@@ -396,30 +371,15 @@ function getThreatDescription(type) {
     return descriptions[type] || 'Security risk detected';
 }
 
-function getThreatIconByType() {
-    return WARNING_ICON_SVG;
-}
-
-function setStatusRing(status) {
-    elements.statusRing?.classList.remove('safe', 'warning', 'suspicious', 'danger', 'scanning');
+// Status is now a plain colored text pill (see popup.css .status-pill) -
+// no icon, the color + label text carry the meaning on their own.
+function setStatusPill(status) {
+    elements.statusPill?.classList.remove('safe', 'warning', 'suspicious', 'danger', 'scanning');
     elements.statusHero?.classList.remove('safe', 'warning', 'suspicious', 'danger');
 
     if (status) {
-        elements.statusRing?.classList.add(status);
+        elements.statusPill?.classList.add(status);
         elements.statusHero?.classList.add(status);
-    }
-
-    // Update icon
-    const icons = {
-        safe: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>',
-        warning: '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>',
-        suspicious: '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>',
-        danger: '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>',
-        scanning: '<path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4.01 7.58 4.01 12C4.01 16.42 7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z"/>'
-    };
-
-    if (elements.statusIcon && icons[status]) {
-        elements.statusIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor">${icons[status]}</svg>`;
     }
 }
 
@@ -487,7 +447,6 @@ async function loadHistory() {
     if (!response?.history || response.history.length === 0) {
         elements.historyList.innerHTML = `
             <div class="history-empty">
-                <span class="empty-icon">${HISTORY_ICON_SVG}</span>
                 <span>No activity yet</span>
             </div>
         `;

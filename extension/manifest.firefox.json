@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Phishing Guard",
-    "version": "2.3.0",
+    "version": "2.4.0",
     "description": "Real-time phishing protection with continuous scanning. Detects and alerts you about suspicious websites and links.",
     "author": "Phishing Guard Team",
     "browser_specific_settings": {
