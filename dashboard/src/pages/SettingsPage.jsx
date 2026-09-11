@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiGet, apiPut } from '../api'
+import { ShieldIcon, LockIcon, CardIcon, LinkIcon, BellIcon, BlockIcon, SpeakerIcon, MoonIcon } from '../icons'
 
 const LEVELS = ['low', 'medium', 'high']
 
@@ -105,28 +106,28 @@ export default function SettingsPage() {
             <h3 className="settings-title">Protection Modules</h3>
             <div className="settings-card">
               <SettingsToggle
-                icon="🛡️"
+                icon={<ShieldIcon />}
                 title="Phishing Protection"
                 desc="Detect and block phishing websites"
                 checked={settings.modules.phishing_protection}
                 onChange={() => toggleModule('phishing_protection')}
               />
               <SettingsToggle
-                icon="🔐"
+                icon={<LockIcon />}
                 title="Password Guard"
                 desc="Protect password entry on untrusted sites"
                 checked={settings.modules.password_guard}
                 onChange={() => toggleModule('password_guard')}
               />
               <SettingsToggle
-                icon="💳"
+                icon={<CardIcon />}
                 title="Payment Protection"
                 desc="Enhanced security for payment forms"
                 checked={settings.modules.payment_protection}
                 onChange={() => toggleModule('payment_protection')}
               />
               <SettingsToggle
-                icon="🔗"
+                icon={<LinkIcon />}
                 title="Link Scanner"
                 desc="Scan links before you click them"
                 checked={settings.modules.link_scanner}
@@ -139,28 +140,28 @@ export default function SettingsPage() {
             <h3 className="settings-title">Preferences</h3>
             <div className="settings-card">
               <SettingsToggle
-                icon="🔔"
+                icon={<BellIcon />}
                 title="Real-time Alerts"
                 desc="Show notifications when threats are detected"
                 checked={settings.preferences.real_time_alerts}
                 onChange={() => togglePreference('real_time_alerts')}
               />
               <SettingsToggle
-                icon="🚫"
+                icon={<BlockIcon />}
                 title="Auto-block Dangerous Sites"
                 desc="Automatically block sites with high risk scores"
                 checked={settings.preferences.auto_block_dangerous}
                 onChange={() => togglePreference('auto_block_dangerous')}
               />
               <SettingsToggle
-                icon="🔊"
+                icon={<SpeakerIcon />}
                 title="Notification Sound"
                 desc="Play sound when threats are blocked"
                 checked={settings.preferences.notification_sound}
                 onChange={() => togglePreference('notification_sound')}
               />
               <SettingsToggle
-                icon="🌙"
+                icon={<MoonIcon />}
                 title="Dark Mode"
                 desc="Use the dark theme across the dashboard"
                 checked={settings.preferences.dark_mode}

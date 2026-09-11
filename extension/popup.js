@@ -8,6 +8,12 @@ import { CONFIG } from './config.js';
 // See background.js for why this one alias is enough for cross-browser support.
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
+// Reusable inline SVG icons - kept as plain SVG (not emoji) so every icon
+// in this popup renders consistently across OS/fonts and matches the
+// brand's single-color iconography instead of mixing in platform emoji.
+const WARNING_ICON_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+const HISTORY_ICON_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>';
+
 // UI Elements
 const elements = {
     app: document.getElementById('app'),
@@ -361,17 +367,11 @@ function getThreatSeverity(warning) {
     return 'low';
 }
 
-function getThreatIcon(warning) {
-    const lower = warning.toLowerCase();
-    if (lower.includes('typosquatting')) return '🎭';
-    if (lower.includes('ssl') || lower.includes('https')) return '🔓';
-    if (lower.includes('phishing')) return '🎣';
-    if (lower.includes('tld') || lower.includes('domain')) return '🌐';
-    if (lower.includes('ip address')) return '📍';
-    if (lower.includes('keyword')) return '🔤';
-    if (lower.includes('@')) return '📧';
-    if (lower.includes('age')) return '📅';
-    return '⚠️';
+function getThreatIcon() {
+    // Severity is already conveyed by the badge text and tinted background,
+    // so a single consistent icon (rather than a different emoji per
+    // category) keeps this visually aligned with the rest of the popup.
+    return WARNING_ICON_SVG;
 }
 
 function formatThreatType(type) {
@@ -389,15 +389,8 @@ function getThreatDescription(type) {
     return descriptions[type] || 'Security risk detected';
 }
 
-function getThreatIconByType(type) {
-    const icons = {
-        'phishing_pattern': '🎣',
-        'ssl_issue': '🔓',
-        'new_domain': '📅',
-        'typosquatting': '🎭',
-        'suspicious_tld': '🌐'
-    };
-    return icons[type] || '⚠️';
+function getThreatIconByType() {
+    return WARNING_ICON_SVG;
 }
 
 function setStatusRing(status) {
@@ -487,7 +480,7 @@ async function loadHistory() {
     if (!response?.history || response.history.length === 0) {
         elements.historyList.innerHTML = `
             <div class="history-empty">
-                <span class="empty-icon">📊</span>
+                <span class="empty-icon">${HISTORY_ICON_SVG}</span>
                 <span>No activity yet</span>
             </div>
         `;

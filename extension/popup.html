@@ -14,22 +14,11 @@
     <header class="header">
       <div class="logo">
         <div class="logo-icon">
-          <svg viewBox="0 0 24 24" fill="none">
-            <defs>
-              <linearGradient id="shield-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#8b5cf6" />
-                <stop offset="50%" stop-color="#3b82f6" />
-                <stop offset="100%" stop-color="#06b6d4" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M12 2L3 7V12C3 17.55 6.84 22.74 12 24C17.16 22.74 21 17.55 21 12V7L12 2ZM10 17L6 13L7.41 11.59L10 14.17L16.59 7.58L18 9L10 17Z"
-              fill="url(#shield-gradient)" />
-          </svg>
+          <img src="icons/icon-48.png" alt="" width="28" height="28" />
         </div>
         <div class="logo-text">
           <span class="logo-name">Phishing Guard</span>
-          <span class="logo-version">Pro v2.2</span>
+          <span class="logo-version">v2.2</span>
         </div>
       </div>
       <div class="header-actions">
@@ -157,7 +146,7 @@
     <!-- Threat Details (shown when threats detected) -->
     <section class="threats-section" id="threats-section" style="display: none;">
       <div class="section-header">
-        <h3 class="section-title">⚠️ Threats Detected</h3>
+        <h3 class="section-title">Threats Detected</h3>
       </div>
       <div class="threats-list" id="threats-list">
         <!-- Dynamically populated -->
@@ -195,7 +184,11 @@
       </div>
       <div class="history-list" id="history-list">
         <div class="history-empty">
-          <span class="empty-icon">📊</span>
+          <span class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+              <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
+            </svg>
+          </span>
           <span>No activity yet</span>
         </div>
       </div>
