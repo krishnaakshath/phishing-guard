@@ -17,9 +17,13 @@ import SettingsPage from './pages/SettingsPage'
 import SiteScannerPage from './pages/SiteScannerPage'
 import PasswordCheckerPage from './pages/PasswordCheckerPage'
 import AdminPage from './pages/AdminPage'
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
+import { isDaytimeNow } from './sunTheme'
 
-// Applies the user's saved dark_mode preference to the document once
-// they're logged in. Defaults to dark (the app's primary look) otherwise.
+// Resolves and applies the active theme. 'auto' (the default, and the only
+// option for logged-out visitors, who have no settings) follows real
+// sunrise/sunset at the user's location - not a fixed clock time. A
+// logged-in user can still force 'light' or 'dark' explicitly in Settings.
 function ThemeSync() {
   const { isAuthenticated } = useAuth()
 
@@ -27,23 +31,46 @@ function ThemeSync() {
     let cancelled = false
 
     async function applyTheme() {
-      if (!isAuthenticated) {
+      let mode = 'auto'
+
+      if (isAuthenticated) {
+        try {
+          const data = await apiGet('/settings')
+          mode = data.settings.preferences.theme_mode || 'auto'
+        } catch {
+          mode = 'auto'
+        }
+      }
+
+      if (cancelled) return
+
+      if (mode === 'light') {
+        document.body.classList.add('theme-light')
+        return
+      }
+      if (mode === 'dark') {
         document.body.classList.remove('theme-light')
         return
       }
+
+      // 'auto'
       try {
-        const data = await apiGet('/settings')
-        if (!cancelled) {
-          document.body.classList.toggle('theme-light', data.settings.preferences.dark_mode === false)
-        }
+        const daytime = await isDaytimeNow()
+        if (!cancelled) document.body.classList.toggle('theme-light', daytime)
       } catch {
-        // keep current theme
+        // Sun calculation failed for some reason - keep the current theme
+        // rather than flipping unexpectedly.
       }
     }
 
     applyTheme()
+    // Re-check roughly hourly so the theme actually flips around sunrise/
+    // sunset for someone who leaves the tab open, not just on page load.
+    const interval = setInterval(applyTheme, 60 * 60 * 1000)
+
     return () => {
       cancelled = true
+      clearInterval(interval)
     }
   }, [isAuthenticated])
 
@@ -101,6 +128,7 @@ function App() {
           />
           <Route path="/tools/site-scanner" element={<SiteScannerPage />} />
           <Route path="/tools/password-checker" element={<PasswordCheckerPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
         </Route>
 
         <Route

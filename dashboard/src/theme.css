@@ -69,7 +69,9 @@
   color-scheme: dark;
 }
 
-/* Optional light theme, toggled via .theme-light on <body> (settings.preferences.dark_mode) */
+/* Light theme, toggled via .theme-light on <body> by ThemeSync in App.jsx -
+   driven by real sunrise/sunset (sunTheme.js) unless a logged-in user has
+   explicitly set preferences.theme_mode to 'light' or 'dark'. */
 .theme-light {
   color-scheme: light;
   --color-bg: #f5f7fa;
@@ -310,7 +312,19 @@ button, input, select, textarea {
 .sidebar-footer {
   padding: var(--space-3);
   border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
+
+.footer-link {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  text-align: center;
+  text-decoration: none;
+  padding: var(--space-1) 0;
+}
+.footer-link:hover { color: var(--color-text-secondary); }
 
 .user-card {
   display: flex;
@@ -456,6 +470,18 @@ button, input, select, textarea {
 .card-row + .card { margin-top: var(--space-5); }
 
 .section-gap { margin-bottom: var(--space-5); }
+
+.policy-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.policy-list strong { color: var(--color-text-primary); }
 
 /* ============================================================
    STATS GRID

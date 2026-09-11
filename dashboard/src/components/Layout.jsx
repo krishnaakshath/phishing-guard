@@ -104,6 +104,9 @@ export default function Layout() {
               Log In
             </NavLink>
           )}
+          <NavLink to="/privacy" className="footer-link">
+            Privacy Policy
+          </NavLink>
         </div>
       </aside>
 

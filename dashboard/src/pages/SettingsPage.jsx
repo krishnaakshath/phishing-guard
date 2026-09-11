@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react'
 import { apiGet, apiPut } from '../api'
-import { ShieldIcon, LockIcon, CardIcon, LinkIcon, BellIcon, BlockIcon, SpeakerIcon, MoonIcon } from '../icons'
+import { ShieldIcon, LockIcon, CardIcon, LinkIcon, BellIcon, BlockIcon, SpeakerIcon } from '../icons'
 
 const LEVELS = ['low', 'medium', 'high']
+const THEME_MODES = [
+  { key: 'auto', label: 'Auto' },
+  { key: 'light', label: 'Light' },
+  { key: 'dark', label: 'Dark' },
+]
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState(null)
@@ -55,6 +60,11 @@ export default function SettingsPage() {
   const setLevel = (level) => {
     if (!settings) return
     save({ ...settings, protection_level: level })
+  }
+
+  const setThemeMode = (mode) => {
+    if (!settings) return
+    save({ ...settings, preferences: { ...settings.preferences, theme_mode: mode } })
   }
 
   if (loading) {
@@ -160,13 +170,25 @@ export default function SettingsPage() {
                 checked={settings.preferences.notification_sound}
                 onChange={() => togglePreference('notification_sound')}
               />
-              <SettingsToggle
-                icon={<MoonIcon />}
-                title="Dark Mode"
-                desc="Use the dark theme across the dashboard"
-                checked={settings.preferences.dark_mode}
-                onChange={() => togglePreference('dark_mode')}
-              />
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <h3 className="settings-title">Appearance</h3>
+            <p className="text-muted" style={{ fontSize: 12.5, marginBottom: 'var(--space-3)' }}>
+              Auto follows real sunrise/sunset at your location - light during the day,
+              dark after sundown - not a fixed clock time.
+            </p>
+            <div className="protection-level-row">
+              {THEME_MODES.map(({ key, label }) => (
+                <div
+                  key={key}
+                  className={`level-option ${(settings.preferences.theme_mode || 'auto') === key ? 'active' : ''}`}
+                  onClick={() => setThemeMode(key)}
+                >
+                  {label}
+                </div>
+              ))}
             </div>
           </div>
         </>
