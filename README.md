@@ -65,6 +65,18 @@ with none of them set:
 - `DB_PATH` — SQLite file location. In production this should point at a
   persistent disk (see `render.yaml`) so accounts survive redeploys.
 
+> **Known limitation (as of now, deliberately unaddressed):** `DB_PATH` is
+> **not** currently set on the production Render deploy. Render requires
+> payment info on file to attach a persistent disk to a free-tier service
+> (confirmed directly against their API - returns HTTP 402), so right now
+> every redeploy wipes all registered users, whitelist/blacklist entries,
+> and scan history. Fine for continued testing; not fine once real users
+> are on it. Free managed Postgres was considered as a no-cost workaround
+> but auto-expires after 30 days and would need a real migration off raw
+> `sqlite3` in `models.py` - not worth it for a 30-day stopgap. When ready
+> to actually launch, add a card and a persistent disk (~$7/mo Starter
+> plan) - `render.yaml` is already set up for that, no code changes needed.
+
 To make a user an admin (needed for `/admin` in the dashboard), set
 `is_admin = 1` for their row in the `users` table — there's no self-serve
 promotion flow by design.
