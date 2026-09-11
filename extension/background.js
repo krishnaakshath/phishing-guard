@@ -57,16 +57,37 @@ const state = {
 // INITIALIZATION
 // ============================================
 
+// MV3 service workers are suspended after ~30s of inactivity and restarted
+// fresh (all in-memory state wiped) the next time an event fires - this is
+// normal, intentional Chrome behavior, not something to work around by
+// trying to keep the worker alive forever. The correct fix is the
+// opposite: never assume `state` reflects reality until it's been reloaded
+// from storage at least once in this worker's current lifetime.
+//
+// onInstalled/onStartup alone are NOT enough - they fire on install and on
+// browser launch, but not on every idle-suspend-then-wake cycle, which is
+// by far the most common way this service worker actually restarts during
+// normal browsing. So every event handler below awaits this guard first.
+let stateReadyPromise = null;
+
+function ensureStateLoaded() {
+    if (!stateReadyPromise) {
+        stateReadyPromise = (async () => {
+            await loadState();
+            await loadSessionCaches();
+        })();
+    }
+    return stateReadyPromise;
+}
+
 browserAPI.runtime.onInstalled.addListener(async () => {
-    console.log('Phishing Guard v2.1 installed');
-    await loadState();
-    await loadSessionCaches();
+    console.log('Phishing Guard v2.2 installed');
+    await ensureStateLoaded();
     updateBadge('active');
 });
 
 browserAPI.runtime.onStartup.addListener(async () => {
-    await loadState();
-    await loadSessionCaches();
+    await ensureStateLoaded();
     updateBadge(state.isEnabled ? 'active' : 'disabled');
 });
 
@@ -151,6 +172,7 @@ async function saveState() {
 
 browserAPI.webNavigation.onCompleted.addListener(async (details) => {
     if (details.frameId !== 0) return;
+    await ensureStateLoaded();
     if (!state.isEnabled) return;
 
     try {
@@ -177,6 +199,7 @@ browserAPI.webNavigation.onCompleted.addListener(async (details) => {
 
 browserAPI.tabs.onActivated.addListener(async (activeInfo) => {
     try {
+        await ensureStateLoaded();
         const tab = await browserAPI.tabs.get(activeInfo.tabId);
         if (!tab.url) return;
 
@@ -200,6 +223,12 @@ browserAPI.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleMessage(request, sender) {
+    // Every popup action goes through here - this is the most important
+    // place to guarantee state has actually been loaded from storage,
+    // since the popup can be opened at any moment, including right after
+    // the service worker was suspended and just woke back up fresh.
+    await ensureStateLoaded();
+
     switch (request.action) {
         case 'getStatus':
             return {
